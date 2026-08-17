@@ -11,9 +11,9 @@ import (
 	"strings"
 
 	country "github.com/mikekonan/go-countries"
-	"github.com/techgarage-ir/IP-Hub/config"
-	"github.com/techgarage-ir/IP-Hub/models"
-	"github.com/techgarage-ir/IP-Hub/pluginBase"
+	"github.com/kzeedev/IP-Hub/config"
+	"github.com/kzeedev/IP-Hub/models"
+	"github.com/kzeedev/IP-Hub/pluginBase"
 )
 
 func lookup(countryCode string) pluginBase.Lookup {

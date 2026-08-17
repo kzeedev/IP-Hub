@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/techgarage-ir/IP-Hub/config"
-	"github.com/techgarage-ir/IP-Hub/pluginBase"
+	"github.com/kzeedev/IP-Hub/config"
+	"github.com/kzeedev/IP-Hub/pluginBase"
 )
 
 type LookupCache struct {

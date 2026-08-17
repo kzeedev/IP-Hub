@@ -4,16 +4,17 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	minifier "github.com/beyer-stefan/gofiber-minifier"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cache"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
-	"github.com/gofiber/template/html/v2"
-	"github.com/techgarage-ir/IP-Hub/config"
-	"github.com/techgarage-ir/IP-Hub/database"
-	"github.com/techgarage-ir/IP-Hub/pluginBase"
+	"github.com/kzeedev/IP-Hub/config"
+	"github.com/kzeedev/IP-Hub/database"
+	"github.com/kzeedev/IP-Hub/pluginBase"
 )
 
 var plugins []pluginBase.Plugin
@@ -22,8 +23,7 @@ var app *fiber.App
 func init() {
 	// Validate variables
 	if config.LookupEndpoint == "" {
-		log.Fatal("Lookup service endpoint is not set")
-		return
+		config.LookupEndpoint = "https://stat.ripe.net/data/country-resource-list/data.json?resource="
 	}
 	if config.RedisURL == "" {
 		config.RedisURL = "redis://localhost:6379/2"
@@ -40,23 +40,30 @@ func init() {
 	if rda != "" && rda != " " {
 		config.RedisURL = "redis://" + rda + "/2"
 	}
-	// Initialize Redis client
+	// Initialize Redis client (optional fallback if Redis isn't running locally)
 	db, err := database.New()
-	if err != nil {
-		log.Fatal(err)
-		return
+	if err == nil {
+		defer db.Close()
+	} else {
+		fmt.Printf("Notice: Redis not connected (%v). In-memory cache will be used.\n", err)
 	}
-	defer db.Close()
-
-	// Create view engine
-	engine := html.New("./views", ".html")
 
 	app = fiber.New(fiber.Config{
-		Views: engine,
+		AppName: "IP-Hub v2.0",
 	})
 
-	// Configure rate limiter
-	app.Use("/lookup", limiter.New())
+	// CORS Middleware
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "*",
+		AllowHeaders: "Origin, Content-Type, Accept",
+		AllowMethods: "GET, POST, OPTIONS",
+	}))
+
+	// Configure rate limiter for /lookup and /api/whois/batch
+	app.Use("/lookup", limiter.New(limiter.Config{
+		Max:        100,
+		Expiration: 1 * time.Minute,
+	}))
 
 	// Configure minifier
 	app.Use(minifier.New(minifier.Config{
@@ -67,15 +74,43 @@ func init() {
 		SuppressWarnings: true,
 	}))
 
-	// Configure cache
-	app.Use(cache.New())
+	// Configure cache for static assets
+	app.Use("/assets", cache.New(cache.Config{
+		Expiration:   24 * time.Hour,
+		CacheControl: true,
+	}))
 
-	// Routes
-	app.Get("/", handleHome)
+	// Native Go WHOIS API Endpoints
+	api := app.Group("/api/whois")
+	api.Get("/myip", handleWhoisMyIp)
+	api.Get("/lookup/*", handleWhoisLookup)
+	api.Get("/lookup", handleWhoisLookup)
+	api.Get("/country/:code", handleWhoisCountry)
+	api.Post("/resolve-orgs", handleWhoisResolveOrgs)
+	api.Post("/batch", handleWhoisBatch)
+	api.Get("/subnet", handleWhoisSubnet)
+
+	// Legacy IP-Hub plugin endpoint
 	app.Post("/lookup", handleRequest)
-	app.Static("/", "./public")
+
+	// Serve Frontend Single Page Application (dist/)
+	app.Static("/", "./dist")
+	app.Static("/public", "./public")
+
+	// SPA fallback: Route all non-API GET requests to dist/index.html
+	app.Get("*", func(c *fiber.Ctx) error {
+		if strings.HasPrefix(c.Path(), "/api") {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Endpoint not found"})
+		}
+		return c.SendFile("./dist/index.html")
+	})
 }
 
 func main() {
-	log.Fatal(app.Listen(":3000"))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3000"
+	}
+	fmt.Printf("IP-Hub Server running on http://localhost:%s\n", port)
+	log.Fatal(app.Listen(":" + port))
 }

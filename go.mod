@@ -1,4 +1,4 @@
-module github.com/techgarage-ir/IP-Hub
+module github.com/kzeedev/IP-Hub
 
 go 1.24
 

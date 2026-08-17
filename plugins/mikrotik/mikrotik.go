@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/techgarage-ir/IP-Hub/pluginBase"
+	"github.com/kzeedev/IP-Hub/pluginBase"
 )
 
 const id string = "mikrotik"

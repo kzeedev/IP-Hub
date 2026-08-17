@@ -5,9 +5,9 @@ import (
 	"log"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/techgarage-ir/IP-Hub/config"
-	"github.com/techgarage-ir/IP-Hub/database"
-	"github.com/techgarage-ir/IP-Hub/pluginBase"
+	"github.com/kzeedev/IP-Hub/config"
+	"github.com/kzeedev/IP-Hub/database"
+	"github.com/kzeedev/IP-Hub/pluginBase"
 )
 
 type FormRequest struct {
