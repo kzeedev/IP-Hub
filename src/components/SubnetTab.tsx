@@ -11,7 +11,8 @@ interface SubnetTabProps {
 export const SubnetTab: React.FC<SubnetTabProps> = ({ subnet, cidr }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  const handleCopy = (key: string, val: string) => {
+  const handleCopy = (key: string, val?: string) => {
+    if (!val) return;
     copyToClipboard(val);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);

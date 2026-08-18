@@ -27,7 +27,8 @@ export const SubnetCalcTool: React.FC = () => {
     }
   };
 
-  const handleCopy = (key: string, val: string) => {
+  const handleCopy = (key: string, val?: string) => {
+    if (!val) return;
     copyToClipboard(val);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);

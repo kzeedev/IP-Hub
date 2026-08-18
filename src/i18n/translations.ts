@@ -29,6 +29,8 @@ export const translations = {
       quickSamples: 'Quick Samples:',
       queryError: 'Query Error',
       retry: 'Retry',
+      querying: 'Querying WHOIS & RDAP...',
+      resolving: 'Resolving network details and geolocation...',
     },
 
     // Tabs
@@ -267,6 +269,8 @@ export const translations = {
       quickSamples: 'نمونه‌های آماده:',
       queryError: 'خطا در جستجو',
       retry: 'تلاش مجدد',
+      querying: 'در حال استعلام از WHOIS و RDAP...',
+      resolving: 'در حال دریافت مشخصات شبکه و موقعیت مکانی...',
     },
 
     // Tabs

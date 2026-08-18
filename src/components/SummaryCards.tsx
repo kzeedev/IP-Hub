@@ -40,8 +40,8 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ record, onSearchReso
           <h3 className="text-base font-bold text-white tracking-tight truncate" title={record.netname}>
             {record.netname}
           </h3>
-          <p className="text-xs text-slate-400 mt-1 truncate" title={record.orgName || record.descr?.[0] || 'RIPE NCC Member'}>
-            {record.orgName || record.descr?.[0] || 'RIPE NCC Member'}
+          <p className="text-xs text-slate-400 mt-1 truncate" title={record.orgName || record.description?.[0] || 'RIPE NCC Member'}>
+            {record.orgName || record.description?.[0] || 'RIPE NCC Member'}
           </p>
         </div>
         <div className="mt-3 pt-2.5 border-t border-slate-700/60 flex items-center justify-between text-xs">
@@ -74,8 +74,8 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ record, onSearchReso
               {copiedField === 'cidr' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
           </div>
-          <p className="font-mono text-[11px] text-slate-400 mt-1 truncate" title={record.ipRange}>
-            {record.ipRange}
+          <p className="font-mono text-[11px] text-slate-400 mt-1 truncate" title={record.range}>
+            {record.range}
           </p>
         </div>
         <div className="mt-3 pt-2.5 border-t border-slate-700/60 flex items-center justify-between text-xs">
