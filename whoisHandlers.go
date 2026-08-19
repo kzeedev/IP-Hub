@@ -53,6 +53,21 @@ func setMemCache(key string, data interface{}, ttl time.Duration) {
 	})
 }
 
+// Calculate TTL to expire at the end of the current UTC day (00:01:00 UTC next day)
+func getEndOfDayTtl() time.Duration {
+	now := time.Now().UTC()
+	endOfDay := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 1, 0, 0, time.UTC)
+	ttl := endOfDay.Sub(now)
+	if ttl < 5*time.Minute {
+		ttl = 24 * time.Hour
+	}
+	return ttl
+}
+
+var (
+	countryBgResolving sync.Map
+)
+
 // Helper: Check if query represents an ASN
 func isAsnQuery(q string) bool {
 	clean := strings.ToUpper(strings.TrimSpace(q))
@@ -781,10 +796,14 @@ func handleWhoisCountry(c *fiber.Ctx) error {
 		})
 	}
 
+	dailyTtl := getEndOfDayTtl()
 	cacheKey := "country_res_" + code
+
 	if cached, ok := getFromMemCache(cacheKey); ok {
 		res := cached.(models.CountryIpResource)
 		res.Cached = true
+		// Trigger background resolution for any remaining unresolved ISP names if not already running
+		go startBackgroundCountryIspResolution(code, res.ASNs, res.IPv4, res.IPv6)
 		return c.JSON(fiber.Map{"data": res})
 	}
 
@@ -834,6 +853,28 @@ func handleWhoisCountry(c *fiber.Ctx) error {
 		}
 	}
 
+	// Pre-populate any ASN names and prefix orgs already in cache
+	asNamesMap := make(map[string]string)
+	for _, asn := range asns {
+		asnStr := strconv.Itoa(asn)
+		if cachedName, ok := getFromMemCache("asn_name_" + asnStr); ok {
+			asNamesMap["AS"+asnStr] = cachedName.(string)
+			asNamesMap[asnStr] = cachedName.(string)
+		}
+	}
+
+	prefixOrgsMap := make(map[string]string)
+	for _, p := range ripeStatRes.Data.Resources.Ipv4 {
+		if cachedOrg, ok := getFromMemCache("prefix_org_" + p); ok {
+			prefixOrgsMap[p] = cachedOrg.(string)
+		}
+	}
+	for _, p := range ripeStatRes.Data.Resources.Ipv6 {
+		if cachedOrg, ok := getFromMemCache("prefix_org_" + p); ok {
+			prefixOrgsMap[p] = cachedOrg.(string)
+		}
+	}
+
 	result := models.CountryIpResource{
 		CountryCode:                 code,
 		CountryName:                 countryName,
@@ -845,13 +886,134 @@ func handleWhoisCountry(c *fiber.Ctx) error {
 		IPv4:                        ripeStatRes.Data.Resources.Ipv4,
 		IPv6:                        ripeStatRes.Data.Resources.Ipv6,
 		ASNs:                        asns,
-		AsNames:                     make(map[string]string),
-		PrefixOrgs:                  make(map[string]string),
+		AsNames:                     asNamesMap,
+		PrefixOrgs:                  prefixOrgsMap,
 		Cached:                      false,
 	}
 
-	setMemCache(cacheKey, result, 15*time.Minute)
+	// Store in cache with daily end-of-day TTL
+	setMemCache(cacheKey, result, dailyTtl)
+
+	// Start background fetching & caching of selected country's ISP / Org names
+	go startBackgroundCountryIspResolution(code, asns, ripeStatRes.Data.Resources.Ipv4, ripeStatRes.Data.Resources.Ipv6)
+
 	return c.JSON(fiber.Map{"data": result})
+}
+
+// Background goroutine to resolve and cache all ASN names and Prefix orgs for a country
+func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []string, ipv6 []string) {
+	if _, loaded := countryBgResolving.LoadOrStore(countryCode, true); loaded {
+		return
+	}
+	defer countryBgResolving.Delete(countryCode)
+
+	dailyTtl := getEndOfDayTtl()
+	cacheKey := "country_res_" + countryCode
+
+	// 1. Batch resolve AS Names in chunks of 50
+	var missingAsns []string
+	for _, asn := range asns {
+		asnStr := strconv.Itoa(asn)
+		if _, ok := getFromMemCache("asn_name_" + asnStr); !ok {
+			missingAsns = append(missingAsns, asnStr)
+		}
+	}
+
+	const asnChunkSize = 50
+	for i := 0; i < len(missingAsns); i += asnChunkSize {
+		end := i + asnChunkSize
+		if end > len(missingAsns) {
+			end = len(missingAsns)
+		}
+		chunk := missingAsns[i:end]
+
+		var asRes struct {
+			Data struct {
+				Names map[string]string `json:"names"`
+			} `json:"data"`
+		}
+		u := fmt.Sprintf("https://stat.ripe.net/data/as-names/data.json?resource=%s", strings.Join(chunk, ","))
+		if err := fetchJSON(u, &asRes); err == nil && asRes.Data.Names != nil {
+			for k, v := range asRes.Data.Names {
+				setMemCache("asn_name_"+k, v, dailyTtl)
+				setMemCache("asn_name_AS"+k, v, dailyTtl)
+			}
+
+			if val, ok := getFromMemCache(cacheKey); ok {
+				if res, ok := val.(models.CountryIpResource); ok {
+					if res.AsNames == nil {
+						res.AsNames = make(map[string]string)
+					}
+					for k, v := range asRes.Data.Names {
+						res.AsNames["AS"+k] = v
+						res.AsNames[k] = v
+					}
+					setMemCache(cacheKey, res, dailyTtl)
+				}
+			}
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// 2. Concurrently resolve Prefix Organizations
+	allPrefixes := append([]string{}, ipv4...)
+	allPrefixes = append(allPrefixes, ipv6...)
+
+	var missingPrefixes []string
+	for _, p := range allPrefixes {
+		if _, ok := getFromMemCache("prefix_org_" + p); !ok {
+			missingPrefixes = append(missingPrefixes, p)
+		}
+	}
+
+	if len(missingPrefixes) == 0 {
+		return
+	}
+
+	workerCount := 6
+	prefixChan := make(chan string, len(missingPrefixes))
+	for _, p := range missingPrefixes {
+		prefixChan <- p
+	}
+	close(prefixChan)
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	for w := 0; w < workerCount; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for prefix := range prefixChan {
+				var pRes struct {
+					Data struct {
+						Asns []struct {
+							Holder string `json:"holder"`
+						} `json:"asns"`
+					} `json:"data"`
+				}
+				u := fmt.Sprintf("https://stat.ripe.net/data/prefix-overview/data.json?resource=%s", url.QueryEscape(prefix))
+				if err := fetchJSON(u, &pRes); err == nil && len(pRes.Data.Asns) > 0 && pRes.Data.Asns[0].Holder != "" {
+					holder := pRes.Data.Asns[0].Holder
+					setMemCache("prefix_org_"+prefix, holder, dailyTtl)
+
+					mu.Lock()
+					if val, ok := getFromMemCache(cacheKey); ok {
+						if res, ok := val.(models.CountryIpResource); ok {
+							if res.PrefixOrgs == nil {
+								res.PrefixOrgs = make(map[string]string)
+							}
+							res.PrefixOrgs[prefix] = holder
+							setMemCache(cacheKey, res, dailyTtl)
+						}
+					}
+					mu.Unlock()
+				}
+				time.Sleep(30 * time.Millisecond)
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 func handleWhoisResolveOrgs(c *fiber.Ctx) error {
@@ -865,12 +1027,13 @@ func handleWhoisResolveOrgs(c *fiber.Ctx) error {
 		})
 	}
 
+	dailyTtl := getEndOfDayTtl()
 	orgs := make(map[string]string)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
 	// Resolve AS names
-	var asnNums []string
+	var missingAsns []string
 	for _, a := range body.Asns {
 		var s string
 		switch v := a.(type) {
@@ -880,11 +1043,17 @@ func handleWhoisResolveOrgs(c *fiber.Ctx) error {
 			s = strings.TrimPrefix(strings.ToUpper(v), "AS")
 		}
 		if s != "" {
-			asnNums = append(asnNums, s)
+			if cached, ok := getFromMemCache("asn_name_" + s); ok {
+				name := cached.(string)
+				orgs["AS"+s] = name
+				orgs[s] = name
+			} else {
+				missingAsns = append(missingAsns, s)
+			}
 		}
 	}
 
-	if len(asnNums) > 0 {
+	if len(missingAsns) > 0 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -893,12 +1062,14 @@ func handleWhoisResolveOrgs(c *fiber.Ctx) error {
 					Names map[string]string `json:"names"`
 				} `json:"data"`
 			}
-			u := fmt.Sprintf("https://stat.ripe.net/data/as-names/data.json?resource=%s", strings.Join(asnNums, ","))
-			if err := fetchJSON(u, &asRes); err == nil {
+			u := fmt.Sprintf("https://stat.ripe.net/data/as-names/data.json?resource=%s", strings.Join(missingAsns, ","))
+			if err := fetchJSON(u, &asRes); err == nil && asRes.Data.Names != nil {
 				mu.Lock()
 				for k, v := range asRes.Data.Names {
 					orgs["AS"+k] = v
 					orgs[k] = v
+					setMemCache("asn_name_"+k, v, dailyTtl)
+					setMemCache("asn_name_AS"+k, v, dailyTtl)
 				}
 				mu.Unlock()
 			}
@@ -906,7 +1077,16 @@ func handleWhoisResolveOrgs(c *fiber.Ctx) error {
 	}
 
 	// Resolve Prefixes
+	var missingPrefixes []string
 	for _, p := range body.Prefixes {
+		if cached, ok := getFromMemCache("prefix_org_" + p); ok {
+			orgs[p] = cached.(string)
+		} else {
+			missingPrefixes = append(missingPrefixes, p)
+		}
+	}
+
+	for _, p := range missingPrefixes {
 		prefix := p
 		wg.Add(1)
 		go func() {
@@ -920,9 +1100,11 @@ func handleWhoisResolveOrgs(c *fiber.Ctx) error {
 			}
 			u := fmt.Sprintf("https://stat.ripe.net/data/prefix-overview/data.json?resource=%s", url.QueryEscape(prefix))
 			if err := fetchJSON(u, &pRes); err == nil && len(pRes.Data.Asns) > 0 && pRes.Data.Asns[0].Holder != "" {
+				holder := pRes.Data.Asns[0].Holder
 				mu.Lock()
-				orgs[prefix] = pRes.Data.Asns[0].Holder
+				orgs[prefix] = holder
 				mu.Unlock()
+				setMemCache("prefix_org_"+prefix, holder, dailyTtl)
 			}
 		}()
 	}

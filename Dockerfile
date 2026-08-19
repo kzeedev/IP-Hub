@@ -3,14 +3,12 @@
 # ==========================================
 FROM node:20-alpine AS frontend-builder
 
-WORKDIR /app
+WORKDIR /app/web
 
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY web/package.json web/package-lock.json* ./
+RUN npm install
 
-COPY tsconfig.json vite.config.ts index.html ./
-COPY src/ ./src/
-COPY public/ ./public/
+COPY web/ ./
 
 RUN npm run build
 
@@ -54,10 +52,10 @@ RUN mkdir -p /dist/lib && \
     fi
 
 # Setup directories, SSL certificates, public assets, and compiled frontend SPA
-RUN mkdir -p /dist/etc/ssl/certs /dist/public /dist/dist
+RUN mkdir -p /dist/etc/ssl/certs /dist/web/public /dist/web/dist
 RUN cp /etc/ssl/certs/ca-certificates.crt /dist/etc/ssl/certs/
-RUN cp -r /build/public/* /dist/public/ 2>/dev/null || true
-COPY --from=frontend-builder /app/dist /dist/dist
+RUN cp -r /build/web/public/* /dist/web/public/ 2>/dev/null || true
+COPY --from=frontend-builder /app/web/dist /dist/web/dist
 
 # ==========================================
 # Stage 3: Minimal Production Image

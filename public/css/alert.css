@@ -1,6 +1,0 @@
-.alert-danger {
-    --bs-alert-color: var(--bs-white);
-    --bs-alert-bg: var(--red-vivid);
-    --bs-alert-border-color: var(--orange-vivid-reddish);
-    --bs-alert-link-color: var(--bs-danger-text-emphasis);
-}

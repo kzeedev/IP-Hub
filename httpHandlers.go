@@ -5,7 +5,6 @@ import (
 	"log"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/kzeedev/IP-Hub/config"
 	"github.com/kzeedev/IP-Hub/database"
 	"github.com/kzeedev/IP-Hub/pluginBase"
 )
@@ -16,29 +15,6 @@ type FormRequest struct {
 	Format    string `json:"format"`
 	Access    string `json:"access"`
 	Turnstile string `json:"cf-turnstile-response"`
-}
-
-func handleHome(c *fiber.Ctx) error {
-	formats := make([]struct {
-		ID   string
-		Name string
-	}, len(plugins))
-
-	for i, plugin := range plugins {
-		formats[i] = struct {
-			ID   string
-			Name string
-		}{
-			ID:   plugin.GetID(),
-			Name: plugin.GetName(),
-		}
-	}
-	// Render index
-	return c.Render("main", fiber.Map{
-		"Title":   "IP Hub",
-		"formats": formats,
-		"version": config.Version,
-	})
 }
 
 func handleRequest(c *fiber.Ctx) error {

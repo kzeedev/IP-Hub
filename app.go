@@ -93,14 +93,18 @@ func init() {
 	// Legacy IP-Hub plugin endpoint
 	app.Post("/lookup", handleRequest)
 
-	// Serve Frontend Single Page Application (dist/)
+	// Serve Frontend Single Page Application (web/dist/ and web/public/)
+	app.Static("/", "./web/dist")
 	app.Static("/", "./dist")
-	app.Static("/public", "./public")
+	app.Static("/public", "./web/public")
 
-	// SPA fallback: Route all non-API GET requests to dist/index.html
+	// SPA fallback: Route all non-API GET requests to index.html
 	app.Get("*", func(c *fiber.Ctx) error {
 		if strings.HasPrefix(c.Path(), "/api") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Endpoint not found"})
+		}
+		if _, err := os.Stat("./web/dist/index.html"); err == nil {
+			return c.SendFile("./web/dist/index.html")
 		}
 		return c.SendFile("./dist/index.html")
 	})
