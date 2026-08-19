@@ -20,7 +20,6 @@ FROM golang:alpine AS backend-builder
 RUN apk add --no-cache build-base ca-certificates
 
 ARG Version
-ARG LookupEndpoint
 ENV GOCACHE=/root/.cache/go-build
 
 WORKDIR /build
@@ -31,7 +30,7 @@ RUN go mod download
 COPY . .
 
 # Build main Go application binary
-RUN go build -ldflags="-X 'github.com/kzeedev/IP-Hub/config.Version=${Version}' -X 'github.com/kzeedev/IP-Hub/config.LookupEndpoint=${LookupEndpoint}' -s -w" -trimpath -o /dist/app
+RUN go build -ldflags="-X 'github.com/kzeedev/IP-Hub/config.Version=${Version}' -s -w" -trimpath -o /dist/app
 
 # Build dynamic Go plugins
 RUN for f in plugins/*/*.go; do \

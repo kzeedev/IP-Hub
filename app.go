@@ -21,16 +21,7 @@ var plugins []pluginBase.Plugin
 var app *fiber.App
 
 func init() {
-	// Read and sanitize environment variables with hardcoded fallbacks
-	if lookupEnv := strings.TrimSpace(os.Getenv("LOOKUP_ENDPOINT")); lookupEnv != "" {
-		config.LookupEndpoint = lookupEnv
-	} else if lookupEnv := strings.TrimSpace(os.Getenv("LOOKUP_SOURCE")); lookupEnv != "" {
-		config.LookupEndpoint = lookupEnv
-	} else if lookupEnv := strings.TrimSpace(os.Getenv("LOOKUP_URL")); lookupEnv != "" {
-		config.LookupEndpoint = lookupEnv
-	} else if config.LookupEndpoint == "" {
-		config.LookupEndpoint = config.DefaultLookupEndpoint
-	}
+	// Read and sanitize environment variables
 
 	if redisEnv := strings.TrimSpace(os.Getenv("REDIS_URL")); redisEnv != "" {
 		config.RedisURL = redisEnv
