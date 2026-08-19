@@ -1,55 +1,76 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
+
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>IP-Hub - Country IP Lists, MikroTik & Cisco Firewall Rules, RIPE WHOIS Intelligence | لیست IP کشورها</title>
-    <meta name="author" content="IP-Hub / KZeeDev" />
-    <meta name="keywords" content="IP-Hub, Country IP List, GeoIP, Mikrotik address-list, Cisco ACL country, iptables country ip block, RIPE WHOIS lookup, BGP routing, ASN lookup, Subnet calculator, CIDR allocations, لیست IP کشورها, آی پی هاب, آی پی یاب, رنج آی پی میکروتیک, مسدود سازی بر اساس کشور, لیست آی پی ایران" />
-    <meta name="description" content="IP-Hub is a powerful, free network intelligence platform offering up-to-date Country IP lists in MikroTik address-list, Cisco ACL, .htaccess, and iptables formats, alongside RIPE WHOIS and BGP routing lookup." />
-    <meta name="robots" content="follow, index, max-snippet:-1, max-video-preview:-1, max-image-preview:large" />
-    
-    <!-- OpenGraph -->
-    <meta property="og:title" content="IP-Hub - Country IP Lists & RIPE WHOIS Intelligence" />
-    <meta property="og:description" content="Free country IP address ranges supporting IPv4 & IPv6 with MikroTik, Cisco ACL, .htaccess, and JSON formatters + RIPE WHOIS lookup." />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://ip-hub.ir/" />
-    <meta property="og:site_name" content="IP-Hub | لیست IP کشورها" />
-    <meta property="og:image" content="/img/logo.webp" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IP-Hub - Country IP Lists, MikroTik & Cisco Firewall Rules, RIPE WHOIS Intelligence | لیست IP کشورها</title>
+  <meta name="author" content="IP-Hub / KZeeDev" />
+  <meta name="keywords"
+    content="IP-Hub, Country IP List, GeoIP, Mikrotik address-list, Cisco ACL country, iptables country ip block, RIPE WHOIS lookup, BGP routing, ASN lookup, Subnet calculator, CIDR allocations, لیست IP کشورها, آی پی هاب, آی پی یاب, رنج آی پی میکروتیک, مسدود سازی بر اساس کشور, لیست آی پی ایران" />
+  <meta name="description"
+    content="IP-Hub is a powerful, free network intelligence platform offering up-to-date Country IP lists in MikroTik address-list, Cisco ACL, .htaccess, and iptables formats, alongside RIPE WHOIS and BGP routing lookup." />
+  <meta name="robots" content="follow, index, max-snippet:-1, max-video-preview:-1, max-image-preview:large" />
 
-    <!-- Twitter Cards -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="IP-Hub - Country IP Lists & Network Intelligence" />
-    <meta name="twitter:description" content="Generate MikroTik, Cisco, and .htaccess firewall lists by country. Real-time RIPE WHOIS & ASN inspection." />
-    <meta name="twitter:image" content="/img/logo.webp" />
+  <!-- OpenGraph -->
+  <meta property="og:title" content="IP-Hub - Country IP Lists & RIPE WHOIS Intelligence" />
+  <meta property="og:description"
+    content="Free country IP address ranges supporting IPv4 & IPv6 with MikroTik, Cisco ACL, .htaccess, and JSON formatters + RIPE WHOIS lookup." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://ip-hub.ir/" />
+  <meta property="og:site_name" content="IP-Hub | لیست IP کشورها" />
+  <meta property="og:image" content="/img/logo.webp" />
 
-    <link rel="canonical" href="https://ip-hub.ir/" />
-    <link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32" />
-    <link rel="icon" type="image/png" href="/favicon-16x16.png" sizes="16x16" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link rel="manifest" href="/site.webmanifest" />
+  <!-- Twitter Cards -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="IP-Hub - Country IP Lists & Network Intelligence" />
+  <meta name="twitter:description"
+    content="Generate MikroTik, Cisco, and .htaccess firewall lists by country. Real-time RIPE WHOIS & ASN inspection." />
+  <meta name="twitter:image" content="/img/logo.webp" />
 
-    <!-- Fonts: Inter & Persian Vazirmatn & JetBrains Mono -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="canonical" href="https://ip-hub.ir/" />
+  <link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32" />
+  <link rel="icon" type="image/png" href="/favicon-16x16.png" sizes="16x16" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/site.webmanifest" />
 
-    <!-- Schema.org JSON-LD (Multilingual) -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "IP-Hub",
-      "alternateName": "آی‌پی هاب",
-      "url": "https://ip-hub.ir/",
-      "inLanguage": ["en", "fa"],
-      "applicationCategory": "NetworkingApplication",
-      "description": "Country IP lists, MikroTik and Cisco firewall rule generator, and real-time RIPE WHOIS intelligence | لیست IP کشورها و تولید قوانین فایروال میکروتیک و سیسکو"
-    }
-    </script>
+  <!-- Fonts: Inter & Persian Vazirmatn & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Vazirmatn:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+
+  <!-- Schema.org JSON-LD -->
+  <script type="application/ld+json">
+    [
+      {
+        "@context": "https://schema.org/",
+        "@type": "WebApplication",
+        "name": "IP Hub",
+        "url": "https://ip-hub.ir/",
+        "description": "Country IP lists and firewall rule generator supporting MikroTik, Cisco ACL, htaccess, iptables, JSON, and real-time RIPE WHOIS inspection.",
+        "applicationCategory": "NetworkingApplication",
+        "operatingSystem": "All",
+        "inLanguage": "en-US"
+      },
+      {
+        "@context": "https://schema.org/",
+        "@type": "WebApplication",
+        "name": "آی‌پی هاب",
+        "url": "https://ip-hub.ir/fa",
+        "description": "مرجع لیست رنج IP کشورها، تولید اسکریپت فایروال میکروتیک و سیسکو، و استعلام آنلاین اطلاعات WHOIS و مسیریابی RIPE.",
+        "applicationCategory": "NetworkingApplication",
+        "operatingSystem": "All",
+        "inLanguage": "fa-IR"
+      }
+    ]
+  </script>
 </head>
+
 <body class="bg-[#0b1120] text-slate-100 antialiased selection:bg-cyan-500/30 selection:text-cyan-200 min-h-screen">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
 </body>
+
 </html>
