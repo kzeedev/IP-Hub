@@ -22,7 +22,6 @@ var app *fiber.App
 
 func init() {
 	// Read and sanitize environment variables
-
 	if redisEnv := strings.TrimSpace(os.Getenv("REDIS_URL")); redisEnv != "" {
 		config.RedisURL = redisEnv
 	} else if redisEnv := strings.TrimSpace(os.Getenv("REDIS_ADDR")); redisEnv != "" {
@@ -59,7 +58,7 @@ func init() {
 	}
 
 	app = fiber.New(fiber.Config{
-		AppName: "IP-Hub v2.0",
+		AppName: fmt.Sprintf("IP-Hub %s", config.Version),
 	})
 
 	// CORS Middleware
