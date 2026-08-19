@@ -21,25 +21,44 @@ var plugins []pluginBase.Plugin
 var app *fiber.App
 
 func init() {
-	// Validate variables
-	if config.LookupEndpoint == "" {
-		config.LookupEndpoint = "https://stat.ripe.net/data/country-resource-list/data.json?resource="
+	// Read and sanitize environment variables with hardcoded fallbacks
+	if lookupEnv := strings.TrimSpace(os.Getenv("LOOKUP_ENDPOINT")); lookupEnv != "" {
+		config.LookupEndpoint = lookupEnv
+	} else if lookupEnv := strings.TrimSpace(os.Getenv("LOOKUP_SOURCE")); lookupEnv != "" {
+		config.LookupEndpoint = lookupEnv
+	} else if lookupEnv := strings.TrimSpace(os.Getenv("LOOKUP_URL")); lookupEnv != "" {
+		config.LookupEndpoint = lookupEnv
+	} else if config.LookupEndpoint == "" {
+		config.LookupEndpoint = config.DefaultLookupEndpoint
 	}
-	if config.RedisURL == "" {
-		config.RedisURL = "redis://localhost:6379/2"
+
+	if redisEnv := strings.TrimSpace(os.Getenv("REDIS_URL")); redisEnv != "" {
+		config.RedisURL = redisEnv
+	} else if redisEnv := strings.TrimSpace(os.Getenv("REDIS_ADDR")); redisEnv != "" {
+		if strings.HasPrefix(redisEnv, "redis://") {
+			config.RedisURL = redisEnv
+		} else {
+			config.RedisURL = "redis://" + redisEnv + "/2"
+		}
+	} else if redisEnv := strings.TrimSpace(os.Getenv("redis")); redisEnv != "" {
+		if strings.HasPrefix(redisEnv, "redis://") {
+			config.RedisURL = redisEnv
+		} else {
+			config.RedisURL = "redis://" + redisEnv + "/2"
+		}
+	} else if config.RedisURL == "" {
+		config.RedisURL = config.DefaultRedisURL
 	}
-	if config.Version == "" {
+
+	if versionEnv := strings.TrimSpace(os.Getenv("VERSION")); versionEnv != "" {
+		config.Version = versionEnv
+	} else if config.Version == "" {
 		config.Version = fmt.Sprintf("%v-%v", time.Now().Month(), time.Now().Day())
 	}
 
 	// Load plugins
 	loadPlugins()
 
-	// Create database connection
-	rda := os.Getenv("redis")
-	if rda != "" && rda != " " {
-		config.RedisURL = "redis://" + rda + "/2"
-	}
 	// Initialize Redis client (optional fallback if Redis isn't running locally)
 	db, err := database.New()
 	if err == nil {
