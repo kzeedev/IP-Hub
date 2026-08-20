@@ -14,43 +14,14 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	country "github.com/mikekonan/go-countries"
+	"github.com/kzeedev/IP-Hub/database"
 	"github.com/kzeedev/IP-Hub/models"
+	country "github.com/mikekonan/go-countries"
 )
 
 // HTTP Client with sane timeouts
 var httpClient = &http.Client{
 	Timeout: 7 * time.Second,
-}
-
-// In-Memory Cache with TTL
-type cacheItem struct {
-	data      interface{}
-	expiresAt time.Time
-}
-
-var (
-	memCache sync.Map
-)
-
-func getFromMemCache(key string) (interface{}, bool) {
-	val, ok := memCache.Load(key)
-	if !ok {
-		return nil, false
-	}
-	item := val.(cacheItem)
-	if time.Now().After(item.expiresAt) {
-		memCache.Delete(key)
-		return nil, false
-	}
-	return item.data, true
-}
-
-func setMemCache(key string, data interface{}, ttl time.Duration) {
-	memCache.Store(key, cacheItem{
-		data:      data,
-		expiresAt: time.Now().Add(ttl),
-	})
 }
 
 // Calculate TTL to expire at the end of the current UTC day (00:01:00 UTC next day)
@@ -222,10 +193,10 @@ func fetchJSON(targetURL string, target interface{}) error {
 func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 	query := strings.TrimSpace(rawQuery)
 	cacheKey := "whois_ip_" + query
-	if cached, ok := getFromMemCache(cacheKey); ok {
-		rec := cached.(models.WhoisRecord)
-		rec.Cached = true
-		return &rec, nil
+	var cachedRecord models.WhoisRecord
+	if found, _ := database.GetJSON(cacheKey, &cachedRecord); found {
+		cachedRecord.Cached = true
+		return &cachedRecord, nil
 	}
 
 	startTime := time.Now()
@@ -341,9 +312,9 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 		defer wg.Done()
 		var routRes struct {
 			Data struct {
-				Prefix     string `json:"prefix"`
-				Announced  bool   `json:"announced"`
-				Origins    []struct {
+				Prefix    string `json:"prefix"`
+				Announced bool   `json:"announced"`
+				Origins   []struct {
 					Origin string `json:"origin"`
 				} `json:"origins"`
 				Visibility struct {
@@ -610,7 +581,7 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 		ResponseTimeMs: time.Since(startTime).Milliseconds(),
 	}
 
-	setMemCache(cacheKey, *record, 5*time.Minute)
+	_ = database.SetJSON(cacheKey, *record, 5*time.Minute)
 	return record, nil
 }
 
@@ -621,9 +592,9 @@ func executeAsnLookup(rawQuery string) (*models.AsnRecord, error) {
 	asnNum, _ := strconv.Atoi(asnNumStr)
 
 	cacheKey := "whois_asn_" + asnNumStr
-	if cached, ok := getFromMemCache(cacheKey); ok {
-		rec := cached.(models.AsnRecord)
-		return &rec, nil
+	var cachedRecord models.AsnRecord
+	if found, _ := database.GetJSON(cacheKey, &cachedRecord); found {
+		return &cachedRecord, nil
 	}
 
 	startTime := time.Now()
@@ -692,7 +663,7 @@ func executeAsnLookup(rawQuery string) (*models.AsnRecord, error) {
 	}
 	record.RoutingStatus.Announced = announced
 
-	setMemCache(cacheKey, *record, 10*time.Minute)
+	_ = database.SetJSON(cacheKey, *record, 10*time.Minute)
 	return record, nil
 }
 
@@ -799,12 +770,12 @@ func handleWhoisCountry(c *fiber.Ctx) error {
 	dailyTtl := getEndOfDayTtl()
 	cacheKey := "country_res_" + code
 
-	if cached, ok := getFromMemCache(cacheKey); ok {
-		res := cached.(models.CountryIpResource)
-		res.Cached = true
+	var cached models.CountryIpResource
+	if found, _ := database.GetJSON(cacheKey, &cached); found {
+		cached.Cached = true
 		// Trigger background resolution for any remaining unresolved ISP names if not already running
-		go startBackgroundCountryIspResolution(code, res.ASNs, res.IPv4, res.IPv6)
-		return c.JSON(fiber.Map{"data": res})
+		go startBackgroundCountryIspResolution(code, cached.ASNs, cached.IPv4, cached.IPv6)
+		return c.JSON(fiber.Map{"data": cached})
 	}
 
 	countryName := code
@@ -857,21 +828,24 @@ func handleWhoisCountry(c *fiber.Ctx) error {
 	asNamesMap := make(map[string]string)
 	for _, asn := range asns {
 		asnStr := strconv.Itoa(asn)
-		if cachedName, ok := getFromMemCache("asn_name_" + asnStr); ok {
-			asNamesMap["AS"+asnStr] = cachedName.(string)
-			asNamesMap[asnStr] = cachedName.(string)
+		var cachedName string
+		if found, _ := database.GetJSON("asn_name_"+asnStr, &cachedName); found && cachedName != "" {
+			asNamesMap["AS"+asnStr] = cachedName
+			asNamesMap[asnStr] = cachedName
 		}
 	}
 
 	prefixOrgsMap := make(map[string]string)
 	for _, p := range ripeStatRes.Data.Resources.Ipv4 {
-		if cachedOrg, ok := getFromMemCache("prefix_org_" + p); ok {
-			prefixOrgsMap[p] = cachedOrg.(string)
+		var cachedOrg string
+		if found, _ := database.GetJSON("prefix_org_"+p, &cachedOrg); found && cachedOrg != "" {
+			prefixOrgsMap[p] = cachedOrg
 		}
 	}
 	for _, p := range ripeStatRes.Data.Resources.Ipv6 {
-		if cachedOrg, ok := getFromMemCache("prefix_org_" + p); ok {
-			prefixOrgsMap[p] = cachedOrg.(string)
+		var cachedOrg string
+		if found, _ := database.GetJSON("prefix_org_"+p, &cachedOrg); found && cachedOrg != "" {
+			prefixOrgsMap[p] = cachedOrg
 		}
 	}
 
@@ -891,8 +865,8 @@ func handleWhoisCountry(c *fiber.Ctx) error {
 		Cached:                      false,
 	}
 
-	// Store in cache with daily end-of-day TTL
-	setMemCache(cacheKey, result, dailyTtl)
+	// Store in Redis with daily end-of-day TTL
+	_ = database.SetJSON(cacheKey, result, dailyTtl)
 
 	// Start background fetching & caching of selected country's ISP / Org names
 	go startBackgroundCountryIspResolution(code, asns, ripeStatRes.Data.Resources.Ipv4, ripeStatRes.Data.Resources.Ipv6)
@@ -914,7 +888,8 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 	var missingAsns []string
 	for _, asn := range asns {
 		asnStr := strconv.Itoa(asn)
-		if _, ok := getFromMemCache("asn_name_" + asnStr); !ok {
+		var val string
+		if found, _ := database.GetJSON("asn_name_"+asnStr, &val); !found || val == "" {
 			missingAsns = append(missingAsns, asnStr)
 		}
 	}
@@ -935,21 +910,20 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 		u := fmt.Sprintf("https://stat.ripe.net/data/as-names/data.json?resource=%s", strings.Join(chunk, ","))
 		if err := fetchJSON(u, &asRes); err == nil && asRes.Data.Names != nil {
 			for k, v := range asRes.Data.Names {
-				setMemCache("asn_name_"+k, v, dailyTtl)
-				setMemCache("asn_name_AS"+k, v, dailyTtl)
+				_ = database.SetJSON("asn_name_"+k, v, dailyTtl)
+				_ = database.SetJSON("asn_name_AS"+k, v, dailyTtl)
 			}
 
-			if val, ok := getFromMemCache(cacheKey); ok {
-				if res, ok := val.(models.CountryIpResource); ok {
-					if res.AsNames == nil {
-						res.AsNames = make(map[string]string)
-					}
-					for k, v := range asRes.Data.Names {
-						res.AsNames["AS"+k] = v
-						res.AsNames[k] = v
-					}
-					setMemCache(cacheKey, res, dailyTtl)
+			var res models.CountryIpResource
+			if found, _ := database.GetJSON(cacheKey, &res); found {
+				if res.AsNames == nil {
+					res.AsNames = make(map[string]string)
 				}
+				for k, v := range asRes.Data.Names {
+					res.AsNames["AS"+k] = v
+					res.AsNames[k] = v
+				}
+				_ = database.SetJSON(cacheKey, res, dailyTtl)
 			}
 		}
 		time.Sleep(50 * time.Millisecond)
@@ -961,7 +935,8 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 
 	var missingPrefixes []string
 	for _, p := range allPrefixes {
-		if _, ok := getFromMemCache("prefix_org_" + p); !ok {
+		var val string
+		if found, _ := database.GetJSON("prefix_org_"+p, &val); !found || val == "" {
 			missingPrefixes = append(missingPrefixes, p)
 		}
 	}
@@ -978,9 +953,8 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 	close(prefixChan)
 
 	var wg sync.WaitGroup
-	var mu sync.Mutex
 
-	for w := 0; w < workerCount; w++ {
+	for range workerCount {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -995,19 +969,16 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 				u := fmt.Sprintf("https://stat.ripe.net/data/prefix-overview/data.json?resource=%s", url.QueryEscape(prefix))
 				if err := fetchJSON(u, &pRes); err == nil && len(pRes.Data.Asns) > 0 && pRes.Data.Asns[0].Holder != "" {
 					holder := pRes.Data.Asns[0].Holder
-					setMemCache("prefix_org_"+prefix, holder, dailyTtl)
+					_ = database.SetJSON("prefix_org_"+prefix, holder, dailyTtl)
 
-					mu.Lock()
-					if val, ok := getFromMemCache(cacheKey); ok {
-						if res, ok := val.(models.CountryIpResource); ok {
-							if res.PrefixOrgs == nil {
-								res.PrefixOrgs = make(map[string]string)
-							}
-							res.PrefixOrgs[prefix] = holder
-							setMemCache(cacheKey, res, dailyTtl)
+					var res models.CountryIpResource
+					if found, _ := database.GetJSON(cacheKey, &res); found {
+						if res.PrefixOrgs == nil {
+							res.PrefixOrgs = make(map[string]string)
 						}
+						res.PrefixOrgs[prefix] = holder
+						_ = database.SetJSON(cacheKey, res, dailyTtl)
 					}
-					mu.Unlock()
 				}
 				time.Sleep(30 * time.Millisecond)
 			}
@@ -1043,8 +1014,8 @@ func handleWhoisResolveOrgs(c *fiber.Ctx) error {
 			s = strings.TrimPrefix(strings.ToUpper(v), "AS")
 		}
 		if s != "" {
-			if cached, ok := getFromMemCache("asn_name_" + s); ok {
-				name := cached.(string)
+			var name string
+			if found, _ := database.GetJSON("asn_name_"+s, &name); found && name != "" {
 				orgs["AS"+s] = name
 				orgs[s] = name
 			} else {
@@ -1068,8 +1039,8 @@ func handleWhoisResolveOrgs(c *fiber.Ctx) error {
 				for k, v := range asRes.Data.Names {
 					orgs["AS"+k] = v
 					orgs[k] = v
-					setMemCache("asn_name_"+k, v, dailyTtl)
-					setMemCache("asn_name_AS"+k, v, dailyTtl)
+					_ = database.SetJSON("asn_name_"+k, v, dailyTtl)
+					_ = database.SetJSON("asn_name_AS"+k, v, dailyTtl)
 				}
 				mu.Unlock()
 			}
@@ -1079,8 +1050,9 @@ func handleWhoisResolveOrgs(c *fiber.Ctx) error {
 	// Resolve Prefixes
 	var missingPrefixes []string
 	for _, p := range body.Prefixes {
-		if cached, ok := getFromMemCache("prefix_org_" + p); ok {
-			orgs[p] = cached.(string)
+		var org string
+		if found, _ := database.GetJSON("prefix_org_"+p, &org); found && org != "" {
+			orgs[p] = org
 		} else {
 			missingPrefixes = append(missingPrefixes, p)
 		}
@@ -1104,7 +1076,7 @@ func handleWhoisResolveOrgs(c *fiber.Ctx) error {
 				mu.Lock()
 				orgs[prefix] = holder
 				mu.Unlock()
-				setMemCache("prefix_org_"+prefix, holder, dailyTtl)
+				_ = database.SetJSON("prefix_org_"+prefix, holder, dailyTtl)
 			}
 		}()
 	}

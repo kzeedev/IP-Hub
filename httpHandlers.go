@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/kzeedev/IP-Hub/database"
@@ -32,16 +31,10 @@ func handleRequest(c *fiber.Ctx) error {
 		})
 	}
 
-	// Create database connection
-	db, err := database.New()
-	if err != nil {
-		log.Fatal(err)
-	}
-	info, err := db.GetOrSet(request.Country, func() (*pluginBase.Lookup, error) {
+	info, err := database.DB.GetOrSet(request.Country, func() (*pluginBase.Lookup, error) {
 		result := lookup(request.Country)
 		return &result, nil
 	})
-	defer db.Close()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),

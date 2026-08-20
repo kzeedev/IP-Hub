@@ -4,12 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/kzeedev/IP-Hub/config"
 	"github.com/kzeedev/IP-Hub/pluginBase"
+	"github.com/redis/go-redis/v9"
 )
 
 type LookupCache struct {
@@ -17,74 +16,124 @@ type LookupCache struct {
 	ctx    context.Context
 }
 
+// Global default instance
+var DB *LookupCache
+
+// Init initializes the global Redis connection pool.
+func Init() (*LookupCache, error) {
+	db, err := New()
+	if err != nil {
+		return nil, err
+	}
+	DB = db
+	return db, nil
+}
+
+// New creates a new Redis LookupCache instance.
 func New() (*LookupCache, error) {
 	opt, err := redis.ParseURL(config.RedisURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse cache URL: %w", err)
+		return nil, fmt.Errorf("failed to parse Redis URL (%s): %w", config.RedisURL, err)
 	}
-
-	// Configure connection pool
 
 	client := redis.NewClient(opt)
 	ctx := context.Background()
 
 	// Test connection
 	if err := client.Ping(ctx).Err(); err != nil {
-		return nil, fmt.Errorf("failed to connect to cache: %w", err)
+		return nil, fmt.Errorf("failed to connect to Redis (%s): %w", config.RedisURL, err)
 	}
 
-	return &LookupCache{
+	cache := &LookupCache{
 		client: client,
 		ctx:    ctx,
-	}, nil
+	}
+	DB = cache
+	return cache, nil
 }
 
+// GetClient returns the underlying go-redis client.
+func (c *LookupCache) GetClient() *redis.Client {
+	return c.client
+}
+
+// SetJSON serializes any data structure to JSON and saves it in Redis with a TTL.
+func (c *LookupCache) SetJSON(key string, data interface{}, ttl time.Duration) error {
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON for key %s: %w", key, err)
+	}
+	return c.client.Set(c.ctx, key, bytes, ttl).Err()
+}
+
+// GetJSON retrieves a JSON string from Redis and unmarshals it into target.
+// Returns (true, nil) if key exists, (false, nil) if key was not found.
+func (c *LookupCache) GetJSON(key string, target interface{}) (bool, error) {
+	val, err := c.client.Get(c.ctx, key).Result()
+	if err != nil {
+		if err == redis.Nil {
+			return false, nil
+		}
+		return false, err
+	}
+	if err := json.Unmarshal([]byte(val), target); err != nil {
+		return false, fmt.Errorf("failed to unmarshal JSON for key %s: %w", key, err)
+	}
+	return true, nil
+}
+
+// SetString stores a raw string in Redis with a TTL.
+func (c *LookupCache) SetString(key string, value string, ttl time.Duration) error {
+	return c.client.Set(c.ctx, key, value, ttl).Err()
+}
+
+// GetString retrieves a raw string from Redis.
+// Returns (value, true, nil) if key exists, ("", false, nil) if key was not found.
+func (c *LookupCache) GetString(key string) (string, bool, error) {
+	val, err := c.client.Get(c.ctx, key).Result()
+	if err != nil {
+		if err == redis.Nil {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	return val, true, nil
+}
+
+// Delete removes one or more keys from Redis.
+func (c *LookupCache) Delete(keys ...string) error {
+	return c.client.Del(c.ctx, keys...).Err()
+}
+
+// Set stores a pluginBase.Lookup object with expiration until the next 6-hour UTC block.
 func (c *LookupCache) Set(lookup pluginBase.Lookup) error {
 	key := "country:" + lookup.CountryCode
 
-	// Set the data using JSON
-	_, err := c.client.JSONSet(c.ctx, key, "$", lookup).Result()
-	if err != nil {
-		return err
-	}
-
-	// Calculate the duration until the next 6-hour mark in UTC.
-	// Add 1-minute to make sure source is updated
 	now := time.Now().UTC()
 	next := time.Date(now.Year(), now.Month(), now.Day(), now.Hour()-(now.Hour()%6)+6, 1, 0, 0, time.UTC)
 	duration := next.Sub(now)
+	if duration <= 0 {
+		duration = 6 * time.Hour
+	}
 
-	// Set expiration
-	err = c.client.Expire(c.ctx, key, duration).Err()
-	return err
+	return c.SetJSON(key, lookup, duration)
 }
 
+// Get retrieves a cached pluginBase.Lookup object.
 func (c *LookupCache) Get(countryCode string) (*pluginBase.Lookup, error) {
 	key := "country:" + countryCode
-
-	if c.client == nil {
-		fmt.Println("client is nil")
-		return nil, nil
-	}
-
 	var lookup pluginBase.Lookup
-	jsonText, err := c.client.JSONGet(c.ctx, key, "$").Result()
+	found, err := c.GetJSON(key, &lookup)
 	if err != nil {
-		if err == redis.Nil {
-			return nil, nil
-		}
 		return nil, err
 	}
-	if jsonText == "" {
+	if !found {
 		return nil, nil
 	}
-	jsonText = strings.TrimLeft(jsonText, "[")
-	jsonText = strings.TrimRight(jsonText, "]")
-	json.Unmarshal([]byte(jsonText), &lookup)
-
 	return &lookup, nil
 }
 
+// GetOrSet retrieves or fetches and caches a pluginBase.Lookup object.
 func (c *LookupCache) GetOrSet(countryCode string, fetchFunc func() (*pluginBase.Lookup, error)) (*pluginBase.Lookup, error) {
 	lookup, err := c.Get(countryCode)
 	if err != nil {
@@ -99,26 +148,59 @@ func (c *LookupCache) GetOrSet(countryCode string, fetchFunc func() (*pluginBase
 		return nil, err
 	}
 
-	err = c.Set(*lookup)
-	if err != nil {
+	if err := c.Set(*lookup); err != nil {
 		return nil, err
 	}
 
 	return lookup, nil
 }
 
-func (c *LookupCache) Delete(countryCode string) error {
-	key := "country:" + countryCode
-	return c.client.Del(c.ctx, key).Err()
-}
-
+// Health checks if Redis ping succeeds.
 func (c *LookupCache) Health() error {
 	return c.client.Ping(c.ctx).Err()
 }
 
+// Close closes the Redis connection pool.
 func (c *LookupCache) Close() error {
 	if c.client != nil {
 		return c.client.Close()
 	}
 	return nil
+}
+
+// Package-level convenience functions using global DB:
+
+func SetJSON(key string, data interface{}, ttl time.Duration) error {
+	if DB == nil {
+		return fmt.Errorf("redis database client is not initialized")
+	}
+	return DB.SetJSON(key, data, ttl)
+}
+
+func GetJSON(key string, target interface{}) (bool, error) {
+	if DB == nil {
+		return false, fmt.Errorf("redis database client is not initialized")
+	}
+	return DB.GetJSON(key, target)
+}
+
+func SetString(key string, value string, ttl time.Duration) error {
+	if DB == nil {
+		return fmt.Errorf("redis database client is not initialized")
+	}
+	return DB.SetString(key, value, ttl)
+}
+
+func GetString(key string) (string, bool, error) {
+	if DB == nil {
+		return "", false, fmt.Errorf("redis database client is not initialized")
+	}
+	return DB.GetString(key)
+}
+
+func Delete(keys ...string) error {
+	if DB == nil {
+		return fmt.Errorf("redis database client is not initialized")
+	}
+	return DB.Delete(keys...)
 }

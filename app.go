@@ -49,12 +49,9 @@ func init() {
 	// Load plugins
 	loadPlugins()
 
-	// Initialize Redis client (optional fallback if Redis isn't running locally)
-	db, err := database.New()
-	if err == nil {
-		defer db.Close()
-	} else {
-		fmt.Printf("Notice: Redis not connected (%v). In-memory cache will be used.\n", err)
+	// Initialize Redis client (enforce Redis requirement)
+	if _, err := database.Init(); err != nil {
+		log.Fatalf("Fatal: Redis connection required. Could not connect to %s: %v", config.RedisURL, err)
 	}
 
 	app = fiber.New(fiber.Config{
