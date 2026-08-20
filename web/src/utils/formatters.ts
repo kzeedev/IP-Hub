@@ -97,6 +97,33 @@ export function generateFirewallConfig(options: FormatOptions): { text: string; 
       break;
     }
 
+    case 'pf': {
+      filename += '.conf';
+      const pfAction = access === 'allow' ? 'pass' : 'block';
+      const tableName = `ips_${(listName || countryCode).toLowerCase().replace(/[^a-z0-9_]/g, '')}`;
+      const lines: string[] = [
+        `# ========================================================`,
+        `# IP-Hub FreeBSD Packet Filter (pf.conf) Table Export`,
+        `# Country: ${countryName} (${countryCode})`,
+        `# Action: ${pfAction}`,
+        `# Updated at: ${data.queryTime}`,
+        `# ========================================================`,
+        `table <${tableName}> persist {`,
+      ];
+
+      for (const ip of [...v4List, ...v6List]) {
+        lines.push(`    ${ip},`);
+      }
+
+      lines.push('}');
+      lines.push('');
+      lines.push('# Example PF Firewall Rule:');
+      lines.push(`${pfAction} in quick from <${tableName}> to any`);
+
+      content = lines.join('\n');
+      break;
+    }
+
     case 'htaccess': {
       filename = `.htaccess_${countryCode.toLowerCase()}`;
       const lines: string[] = [

@@ -235,6 +235,7 @@ export const translations = {
       "formats": {
         "mikrotik": "MikroTik address-list",
         "cisco": "Cisco access-list",
+        "pf": "FreeBSD Packet Filter (PF)",
         "htaccess": "Apache .htaccess",
         "iptables": "Linux iptables",
         "json": "JSON Data",
@@ -648,6 +649,7 @@ export const translations = {
       "formats": {
         "mikrotik": "میکروتیک (MikroTik address-list)",
         "cisco": "سیسکو (Cisco access-list)",
+        "pf": "فایروال بی‌اس‌دی (FreeBSD PF)",
         "htaccess": "آپاچی (.htaccess)",
         "iptables": "لینوکس (iptables)",
         "json": "ساختار JSON",

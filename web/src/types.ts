@@ -21,6 +21,7 @@ export type Language = 'en' | 'fa';
 export type ExportFormat = 
   | 'mikrotik' 
   | 'cisco' 
+  | 'pf'
   | 'htaccess' 
   | 'iptables' 
   | 'json' 
