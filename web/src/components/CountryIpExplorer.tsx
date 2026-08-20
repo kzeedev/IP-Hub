@@ -569,6 +569,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
                 <option value="mikrotik">{t.countryExplorer.formats.mikrotik}</option>
                 <option value="cisco">{t.countryExplorer.formats.cisco}</option>
                 <option value="pf">{t.countryExplorer.formats.pf}</option>
+                <option value="ipset">{t.countryExplorer.formats.ipset}</option>
                 <option value="htaccess">{t.countryExplorer.formats.htaccess}</option>
                 <option value="iptables">{t.countryExplorer.formats.iptables}</option>
                 <option value="json">{t.countryExplorer.formats.json}</option>

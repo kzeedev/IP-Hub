@@ -22,6 +22,7 @@ export type ExportFormat =
   | 'mikrotik' 
   | 'cisco' 
   | 'pf'
+  | 'ipset'
   | 'htaccess' 
   | 'iptables' 
   | 'json' 

@@ -124,6 +124,50 @@ export function generateFirewallConfig(options: FormatOptions): { text: string; 
       break;
     }
 
+    case 'ipset': {
+      filename += '.sh';
+      const setName = `country_${(listName || countryCode).toLowerCase().replace(/[^a-z0-9_]/g, '')}`;
+      const lines: string[] = [
+        `#!/bin/sh`,
+        `# ========================================================`,
+        `# IP-Hub Linux ipset Rules Export`,
+        `# Country: ${countryName} (${countryCode})`,
+        `# Target Action: ${iptablesTarget}`,
+        `# Updated at: ${data.queryTime}`,
+        `# ========================================================`,
+        '',
+      ];
+
+      if (includeV4 && v4List.length > 0) {
+        lines.push(`# IPv4 Set`);
+        lines.push(`ipset create ${setName} hash:net family inet -exist`);
+        for (const ip of v4List) {
+          lines.push(`ipset add ${setName} ${ip} -exist`);
+        }
+        lines.push('');
+      }
+
+      if (includeV6 && v6List.length > 0) {
+        lines.push(`# IPv6 Set`);
+        lines.push(`ipset create ${setName}_v6 hash:net family inet6 -exist`);
+        for (const ip of v6List) {
+          lines.push(`ipset add ${setName}_v6 ${ip} -exist`);
+        }
+        lines.push('');
+      }
+
+      lines.push('# Example Netfilter / iptables Rules:');
+      if (includeV4 && v4List.length > 0) {
+        lines.push(`iptables -I INPUT -m set --match-set ${setName} src -j ${iptablesTarget}`);
+      }
+      if (includeV6 && v6List.length > 0) {
+        lines.push(`ip6tables -I INPUT -m set --match-set ${setName}_v6 src -j ${iptablesTarget}`);
+      }
+
+      content = lines.join('\n');
+      break;
+    }
+
     case 'htaccess': {
       filename = `.htaccess_${countryCode.toLowerCase()}`;
       const lines: string[] = [
