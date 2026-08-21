@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/kzeedev/IP-Hub/database"
 	"github.com/kzeedev/IP-Hub/pluginBase"
 )
@@ -16,10 +16,10 @@ type FormRequest struct {
 	Turnstile string `json:"cf-turnstile-response"`
 }
 
-func handleRequest(c *fiber.Ctx) error {
+func handleRequest(c fiber.Ctx) error {
 	request := new(FormRequest)
 
-	if err := c.BodyParser(request); err != nil {
+	if err := c.Bind().Body(request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),
 		})

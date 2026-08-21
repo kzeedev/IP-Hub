@@ -8,10 +8,12 @@ import (
 	"time"
 
 	minifier "github.com/beyer-stefan/gofiber-minifier"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cache"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cache"
+	"github.com/gofiber/fiber/v3/middleware/compress"
+	"github.com/gofiber/fiber/v3/middleware/cors"
+	"github.com/gofiber/fiber/v3/middleware/limiter"
+	"github.com/gofiber/fiber/v3/middleware/static"
 	"github.com/kzeedev/IP-Hub/config"
 	"github.com/kzeedev/IP-Hub/database"
 	"github.com/kzeedev/IP-Hub/pluginBase"
@@ -60,9 +62,9 @@ func init() {
 
 	// CORS Middleware
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*",
-		AllowHeaders: "Origin, Content-Type, Accept",
-		AllowMethods: "GET, POST, OPTIONS",
+		AllowOrigins: []string{"*"},
+		AllowHeaders: []string{"Origin, Content-Type, Accept"},
+		AllowMethods: []string{"GET, POST, OPTIONS"},
 	}))
 
 	// Configure rate limiter for /lookup and /api/whois/batch
@@ -77,13 +79,18 @@ func init() {
 		MinifyCSS:        true,
 		MinifyJS:         true,
 		MinifyJSON:       true,
+		MinifyXML:        true,
 		SuppressWarnings: true,
 	}))
 
 	// Configure cache for static assets
 	app.Use("/assets", cache.New(cache.Config{
-		Expiration:   24 * time.Hour,
-		CacheControl: true,
+		Expiration: 24 * time.Hour,
+	}))
+
+	// Configure compression
+	app.Use(compress.New(compress.Config{
+		Level: compress.LevelBestCompression,
 	}))
 
 	// Native Go WHOIS API Endpoints
@@ -100,12 +107,12 @@ func init() {
 	app.Post("/lookup", handleRequest)
 
 	// Serve Frontend Single Page Application (web/dist/ and web/public/)
-	app.Static("/", "./web/dist")
-	app.Static("/", "./dist")
-	app.Static("/public", "./web/public")
+	app.Use("/", static.New("./web/dist"))
+	app.Use("/", static.New("./dist"))
+	app.Use("/public", static.New("./web/public"))
 
 	// SPA fallback: Route all non-API GET requests to index.html
-	app.Get("*", func(c *fiber.Ctx) error {
+	app.Get("*", func(c fiber.Ctx) error {
 		if strings.HasPrefix(c.Path(), "/api") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Endpoint not found"})
 		}

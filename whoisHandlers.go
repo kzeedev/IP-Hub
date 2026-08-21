@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/kzeedev/IP-Hub/database"
 	"github.com/kzeedev/IP-Hub/models"
 	country "github.com/mikekonan/go-countries"
@@ -669,7 +669,7 @@ func executeAsnLookup(rawQuery string) (*models.AsnRecord, error) {
 
 // Handlers for Fiber
 
-func handleWhoisLookup(c *fiber.Ctx) error {
+func handleWhoisLookup(c fiber.Ctx) error {
 	resource := strings.TrimSpace(c.Params("resource"))
 	if resource == "" {
 		resource = strings.TrimSpace(c.Params("*"))
@@ -718,7 +718,7 @@ func handleWhoisLookup(c *fiber.Ctx) error {
 	})
 }
 
-func handleWhoisMyIp(c *fiber.Ctx) error {
+func handleWhoisMyIp(c fiber.Ctx) error {
 	clientIP := c.Get("X-Forwarded-For")
 	if clientIP == "" {
 		clientIP = c.Get("X-Real-IP")
@@ -756,7 +756,7 @@ func handleWhoisMyIp(c *fiber.Ctx) error {
 	})
 }
 
-func handleWhoisCountry(c *fiber.Ctx) error {
+func handleWhoisCountry(c fiber.Ctx) error {
 	code := strings.ToUpper(strings.TrimSpace(c.Params("code")))
 	if code == "" {
 		code = strings.ToUpper(strings.TrimSpace(c.Query("code")))
@@ -987,12 +987,12 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 	wg.Wait()
 }
 
-func handleWhoisResolveOrgs(c *fiber.Ctx) error {
+func handleWhoisResolveOrgs(c fiber.Ctx) error {
 	var body struct {
 		Prefixes []string      `json:"prefixes"`
 		Asns     []interface{} `json:"asns"`
 	}
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
@@ -1085,11 +1085,11 @@ func handleWhoisResolveOrgs(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"orgs": orgs})
 }
 
-func handleWhoisBatch(c *fiber.Ctx) error {
+func handleWhoisBatch(c fiber.Ctx) error {
 	var body struct {
 		Items []string `json:"items"`
 	}
-	if err := c.BodyParser(&body); err != nil || len(body.Items) == 0 {
+	if err := c.Bind().Body(&body); err != nil || len(body.Items) == 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Request body must contain 'items' array",
 		})
@@ -1139,7 +1139,7 @@ func handleWhoisBatch(c *fiber.Ctx) error {
 	})
 }
 
-func handleWhoisSubnet(c *fiber.Ctx) error {
+func handleWhoisSubnet(c fiber.Ctx) error {
 	ip := strings.TrimSpace(c.Query("ip"))
 	cidrStr := strings.TrimSpace(c.Query("cidr"))
 	if ip == "" {
