@@ -90,7 +90,7 @@ export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle 
             <ListPlus className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">{t.batch.title}</h2>
+            <h1 className="text-xl font-bold text-white tracking-tight">{t.batch.title}</h1>
             <p className="text-xs text-slate-400">
               {t.batch.description}
             </p>

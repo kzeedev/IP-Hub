@@ -1,26 +1,36 @@
 # IP-Hub
 
-> IP-Hub is a network intelligence platform and Country IP address resource service. It provides real-time country-level IPv4 & IPv6 CIDR range downloads, firewall rule generation (MikroTik, Cisco ACL, pf, ipset, htaccess), live RIPE WHOIS lookup, Autonomous System (ASN) routing analytics, and CIDR subnet calculation.
+> IP-Hub (https://ip-hub.ir/) is a high-performance network intelligence platform and country-level IP delegation directory. It provides real-time country IPv4 & IPv6 CIDR downloads, firewall rule generators (MikroTik RouterOS, Cisco ACL, FreeBSD Packet Filter, Linux ipset, Apache .htaccess, Nginx), live RIPE WHOIS inspection, Autonomous System (ASN) BGP routing analytics, multi-target batch auditing, and CIDR subnet calculation.
+
+## Core Navigation & Tools
+
+- [Country IP Explorer](https://ip-hub.ir/country-ips): Explore and download delegated IPv4 & IPv6 address prefixes by ISO country code, with multi-format firewall generator scripts.
+- [Single WHOIS & ASN Lookup](https://ip-hub.ir/): Real-time delegated IP prefix lookup, BGP routing inspection, abuse contact retrieval, and RIPE database objects.
+- [Batch WHOIS Inspector](https://ip-hub.ir/batch): Concurrently query and audit up to 50 IP addresses, CIDR blocks, or ASNs with CSV/JSON export.
+- [CIDR Subnet Calculator](https://ip-hub.ir/subnet-calc): Calculate network bounds, netmask, wildcard mask, broadcast address, and usable host ranges.
+- [Source Code & Documentation](https://ip-hub.ir/source): Open-source repository, license, and technical documentation.
+- [Issue Tracker & Bug Reports](https://ip-hub.ir/issues): Community issue submission and feature requests.
 
 ## Primary Use Cases & Guides
 
 ### 1. Country-Based Traffic Filtering & Geo-Blocking
-- **Use Case**: Restrict, allow, or route network traffic based on visitor nationality / geographic origin.
+- **Use Case**: Restrict, allow, or route incoming/outgoing network traffic based on visitor country of origin.
 - **Workflow**:
-  - Select or specify any ISO 3166-1 alpha-2 country code (e.g., `IR`, `DE`, `US`, `FR`, `GB`, `TR`).
-  - Retrieve all allocated and delegated IPv4 and IPv6 network prefixes for that nation.
+  - Select or specify any ISO 3166-1 alpha-2 country code (e.g. `IR`, `DE`, `US`, `FR`, `GB`, `TR`, `NL`, `CA`).
+  - Retrieve all officially allocated and delegated IPv4 and IPv6 network prefixes for that nation.
+  - Filter by IP version (IPv4, IPv6, or dual-stack) or search by ISP / ASN / organization name.
   - Export the collected prefixes into device-ready firewall rules or plain CIDR lists.
 
-### 2. Firewall Rule & Access Policy Generation
+### 2. Edge Firewall Rule & Access Policy Generation
 - **Use Case**: Generate syntax-correct configuration scripts for edge routers, firewalls, and web servers to whitelist or blacklist country IP ranges.
 - **Supported Formats & Syntax**:
-  - **MikroTik RouterOS (`.rsc`)**: Creates `/ip firewall address-list` entries with customizable list names.
+  - **MikroTik RouterOS (`.rsc`)**: Creates `/ip firewall address-list` entries with custom list names.
     ```rsc
     /ip firewall address-list
     add list=COUNTRY_IPS address=2.144.0.0/14 comment="Delegated IP range"
     add list=COUNTRY_IPS address=5.22.0.0/15 comment="Delegated IP range"
     ```
-  - **Cisco IOS ACL**: Creates standard or extended `ip access-list` rules with wildcard masks.
+  - **Cisco IOS ACL**: Creates standard `ip access-list` rules with computed wildcard masks.
     ```cisco
     ip access-list standard COUNTRY_ACL
      permit 2.144.0.0 0.3.255.255
@@ -28,31 +38,31 @@
     ```
   - **FreeBSD / OpenBSD Packet Filter (`pf.conf`)**: Generates persistent table syntax.
     ```pf
-    table <country_ips> persist {
+    table <ips_ir> persist {
       2.144.0.0/14,
       5.22.0.0/15
     }
     ```
-  - **Linux Netfilter / `ipset`**: Generates high-performance hash:net rules.
+  - **Linux Netfilter / `ipset`**: Generates high-performance hash:net sets for iptables and ip6tables.
     ```bash
-    ipset create country_ips hash:net
-    ipset add country_ips 2.144.0.0/14
-    ipset add country_ips 5.22.0.0/15
+    ipset create country_ir hash:net
+    ipset add country_ir 2.144.0.0/14
+    ipset add country_ir 5.22.0.0/15
     ```
-  - **Web Servers (Apache `.htaccess` / Nginx)**: Generates access control directives.
+  - **Web Servers (Apache `.htaccess` / Nginx)**: Generates web server access control directives.
     ```apache
     <RequireAll>
       Require ip 2.144.0.0/14
       Require ip 5.22.0.0/15
     </RequireAll>
     ```
-  - **Raw Text / JSON**: Plain CIDR lists (e.g. `193.0.0.0/21`) or structured JSON for automation scripts.
+  - **Raw Text / JSON**: Plain CIDR lists (e.g. `193.0.0.0/21`) or structured JSON for CI/CD automation pipelines.
 
 ### 3. IP Intelligence & Reverse RIPE WHOIS Investigation
 - **Use Case**: Inspect unknown or suspicious IP addresses, netblocks, domain owners, or ASN numbers.
 - **Workflow**:
   - Query any IPv4, IPv6, CIDR prefix, ASN (e.g. `AS3333`), or RIPE handle.
-  - Inspect organizational details: network name (`netname`), holder organization, allocated CIDR, country, allocation status, and RIPE database objects (`inetnum`, `inet6num`, `organisation`, `person`, `role`, `route`).
+  - Inspect organizational details: network name (`netname`), holder organization, allocated CIDR range, country code, allocation status, and RIPE database objects (`inetnum`, `inet6num`, `organisation`, `person`, `role`, `route`).
   - Directly view official abuse contact mailboxes and incident reporting points (`abuse-c` / `IRT`).
 
 ### 4. BGP Routing & Autonomous System (ASN) Analytics
@@ -63,13 +73,14 @@
   - Review global BGP visibility percentage across RIPE RIS (Routing Information Service) peer collectors.
 
 ### 5. Multi-Target Batch Auditing
-- **Use Case**: Check large lists of IP addresses, subnets, and ASNs simultaneously for security audits or log analysis.
+- **Use Case**: Check large lists of IP addresses, subnets, and ASNs simultaneously for security audits, SOC triage, or server access log analysis.
 - **Workflow**:
-  - Provide a batch list of targets (mixed IPv4, IPv6, ASNs, CIDRs).
+  - Provide a batch list of up to 50 targets (mixed IPv4, IPv6, ASNs, CIDRs).
   - Process queries concurrently to retrieve organized records for all targets in one batch.
+  - Export unified results to CSV or JSON.
 
 ### 6. CIDR Subnet Calculation & Network Planning
-- **Use Case**: Break down network blocks, calculate usable IP ranges, broadcast addresses, and subnet masks for network design.
+- **Use Case**: Break down network blocks, calculate usable IP ranges, broadcast addresses, and subnet masks for network design and routing tables.
 - **Workflow**:
-  - Enter any IPv4 or IPv6 prefix (e.g. `192.168.1.0/24` or `10.0.0.0/16`).
-  - Calculate network address, netmask, wildcard mask, broadcast address, first and last usable host IPs, and total usable host count.
+  - Enter any IPv4 or IPv6 prefix (e.g. `193.0.0.0/21` or `10.0.0.0/16`).
+  - Compute network address, netmask, wildcard mask, broadcast address, first and last usable host IPs, and total usable host count.

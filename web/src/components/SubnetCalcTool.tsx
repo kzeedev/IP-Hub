@@ -44,7 +44,7 @@ export const SubnetCalcTool: React.FC = () => {
             <Calculator className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">{t.subnetCalc.title}</h2>
+            <h1 className="text-xl font-bold text-white tracking-tight">{t.subnetCalc.title}</h1>
             <p className="text-xs text-slate-400">
               {t.subnetCalc.description}
             </p>

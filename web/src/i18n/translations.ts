@@ -18,6 +18,8 @@ export const translations = {
       "themeDark": "Dark Mode"
     },
     "search": {
+      "title": "IP Address & Autonomous System WHOIS Explorer",
+      "subtitle": "Query real-time allocated IP blocks, ASN routing status, BGP visibility, and RIPE database objects.",
       "placeholder": "Search IP, CIDR prefix, or ASN (e.g. 193.0.6.139, AS3333, 193.0.0.0/21)...",
       "button": "Inspect",
       "historyTitle": "Recent Lookups",
@@ -333,10 +335,10 @@ export const translations = {
       "intro": "IP-Hub is a free and open-source network intelligence service providing updated country-specific IP address lists in various formats alongside RIPE WHOIS data.",
       "projectPage": "Project Homepage",
       "githubRepo": "GitHub Repository",
-      "featuresTitle": "Key Architecture & Capabilities",
+      "featuresTitle": "Key Capabilities & Features",
       "feature1": "Comprehensive IPv4 and IPv6 Country IP delegations fetched directly from RIPE NCC and RIR databases.",
       "feature2": "Instant export for MikroTik RouterOS, Cisco IOS ACLs, Apache .htaccess, Linux iptables, and JSON.",
-      "feature3": "Low-latency Redis caching and high-concurrency Go Fiber backend.",
+      "feature3": "High-speed distributed caching and ultra-low latency concurrent query processing.",
       "feature4": "Real-time BGP routing, ASN announcements, and abuse contact discovery.",
       "communityTitle": "Join the Community",
       "communityText": "IP-Hub is completely open source under the MIT License. Contributions, feedback, and pull requests are welcomed."
@@ -356,7 +358,7 @@ export const translations = {
       "title": "Settings & Application Info",
       "version": "Application Version",
       "status": "Backend Status",
-      "connected": "Go Fiber Backend Online",
+      "connected": "Network Services Online",
       "language": "Language / زبان",
       "theme": "Theme Preference",
       "close": "Close"
@@ -433,6 +435,8 @@ export const translations = {
       "themeDark": "حالت تاریک"
     },
     "search": {
+      "title": "جستجو و استعلام آنلاین WHOIS و رنج آی‌پی",
+      "subtitle": "استعلام لحظه‌ای بلاک‌های IP، وضعیت مسیریابی BGP، شماره ASN و مشخصات مالک در دیتابیس RIPE.",
       "placeholder": "جستجوی IP، رنج CIDR یا شماره ASN (مثال: 193.0.6.139 یا AS3333)...",
       "button": "جستجو و استعلام",
       "historyTitle": "جستجوهای اخیر",
@@ -748,10 +752,10 @@ export const translations = {
       "intro": "پروژه IP-Hub یک سرویس کاملاً رایگان و اوپن‌سورس جهت استعلام رنج‌های IP کشورها و اطلاعات شبکه است.",
       "projectPage": "صفحه اصلی پروژه",
       "githubRepo": "مخزن رسمی در گیت‌هاب",
-      "featuresTitle": "ویژگی‌ها و معماری سیستم",
+      "featuresTitle": "ویژگی‌ها و قابلیت‌های سامانه",
       "feature1": "دریافت مستقیم بازه‌های IP اختصاص‌یافته از RIPE NCC و سایر رجیستری‌های قاره‌ای.",
       "feature2": "تولید آنی خروجی برای میکروتیک (RouterOS Address List)، سیسکو ACL، آپاچی htaccess و لینوکس iptables.",
-      "feature3": "بک‌ند بسیار سریع با زبان Go و فریم‌ورک Fiber به همراه کش قدرتمند Redis.",
+      "feature3": "پردازش سریع و هم‌روند استعلام‌ها با کش هوشمند و پاسخ‌دهی با حداقل تاخیر.",
       "feature4": "استعلام زنده مسیرهای BGP، پیشوندهای اعلام‌شده و اطلاعات تماس جهت گزارش Abuse.",
       "communityTitle": "پیوستن به جامعه توسعه‌دهندگان",
       "communityText": "این پروژه تحت مجوز MIT منتشر شده و مشارکت شما در بهبود کدها و اضافه کردن قابلیت‌های جدید مایه افتخار است."
@@ -771,7 +775,7 @@ export const translations = {
       "title": "تنظیمات و اطلاعات سیستم",
       "version": "نسخه برنامه",
       "status": "وضعیت بک‌ند",
-      "connected": "بک‌ند Go Fiber فعال است",
+      "connected": "سرویس‌های شبکه فعال هستند",
       "language": "زبان سامانه / Language",
       "theme": "پوسته ظاهری",
       "close": "بستن"

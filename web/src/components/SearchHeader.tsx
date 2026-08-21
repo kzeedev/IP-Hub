@@ -56,6 +56,16 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
     <div className="w-full bg-slate-900 border-b border-slate-800/80 py-5 sm:py-8 px-3 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         
+        {/* Main SEO Title & Subtitle */}
+        <div className="text-center mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
+            {t.search.title}
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl mx-auto">
+            {t.search.subtitle}
+          </p>
+        </div>
+
         {/* Main Search Input Form */}
         <form onSubmit={handleSubmit} className="relative">
           <div className="relative flex items-center shadow-2xl rounded-2xl overflow-hidden border border-slate-700 bg-slate-800/90 focus-within:border-cyan-500 focus-within:ring-2 focus-within:ring-cyan-500/20 transition-all">
