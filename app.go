@@ -14,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
 	"github.com/gofiber/fiber/v3/middleware/static"
+	"github.com/joho/godotenv"
 	"github.com/kzeedev/IP-Hub/config"
 	"github.com/kzeedev/IP-Hub/database"
 	"github.com/kzeedev/IP-Hub/pluginBase"
@@ -23,35 +24,31 @@ var plugins []pluginBase.Plugin
 var app *fiber.App
 
 func init() {
-	// Read and sanitize environment variables
-	if redisEnv := strings.TrimSpace(os.Getenv("REDIS_URL")); redisEnv != "" {
-		config.RedisURL = redisEnv
-	} else if redisEnv := strings.TrimSpace(os.Getenv("REDIS_ADDR")); redisEnv != "" {
-		if strings.HasPrefix(redisEnv, "redis://") {
-			config.RedisURL = redisEnv
-		} else {
-			config.RedisURL = "redis://" + redisEnv + "/2"
-		}
-	} else if redisEnv := strings.TrimSpace(os.Getenv("redis")); redisEnv != "" {
-		if strings.HasPrefix(redisEnv, "redis://") {
-			config.RedisURL = redisEnv
-		} else {
-			config.RedisURL = "redis://" + redisEnv + "/2"
-		}
-	} else if config.RedisURL == "" {
-		config.RedisURL = config.DefaultRedisURL
+	// 1. Load local .env file if present
+	_ = godotenv.Load()
+
+	// 2. Validate strictly required environment variables
+	var missing []string
+	redisURL := strings.TrimSpace(os.Getenv("REDIS_URL"))
+	if redisURL == "" {
+		missing = append(missing, "REDIS_URL")
+	} else {
+		config.RedisURL = redisURL
 	}
 
-	if versionEnv := strings.TrimSpace(os.Getenv("VERSION")); versionEnv != "" {
-		config.Version = versionEnv
-	} else if config.Version == "" {
-		config.Version = fmt.Sprintf("%v-%v", time.Now().Month(), time.Now().Day())
+	turnstileSecret := strings.TrimSpace(os.Getenv("TURNSTILE_SECRET"))
+	if turnstileSecret == "" {
+		missing = append(missing, "TURNSTILE_SECRET")
 	}
 
-	// Load plugins
+	if len(missing) > 0 {
+		log.Fatalf("Fatal: missing required environment variable(s): %s", strings.Join(missing, ", "))
+	}
+
+	// 3. Load dynamic plugins
 	loadPlugins()
 
-	// Initialize Redis client (enforce Redis requirement)
+	// 4. Initialize Redis client (strictly required)
 	if _, err := database.Init(); err != nil {
 		log.Fatalf("Fatal: Redis connection required. Could not connect to %s: %v", config.RedisURL, err)
 	}

@@ -6,9 +6,11 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"plugin"
 	"strings"
+	"time"
 
 	country "github.com/mikekonan/go-countries"
 	"github.com/kzeedev/IP-Hub/config"
@@ -108,17 +110,27 @@ func loadPlugins() {
 }
 
 func ValidateCaptcha(turnstile string) bool {
-	client := &http.Client{}
-	var data = strings.NewReader(`secret=0x4AAAAAABcvDFZIP0YMm9YRGQJC8wct55Q&response=` + turnstile)
+	if turnstile == "" {
+		return false
+	}
+
+	secret := strings.TrimSpace(os.Getenv("TURNSTILE_SECRET"))
+	if secret == "" {
+		log.Println("Error: TURNSTILE_SECRET environment variable is not set")
+		return false
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	var data = strings.NewReader(fmt.Sprintf("secret=%s&response=%s", secret, turnstile))
 	req, err := http.NewRequest("POST", "https://challenges.cloudflare.com/turnstile/v0/siteverify", data)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Turnstile request creation error: %v\n", err)
 		return false
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Turnstile verification HTTP error: %v\n", err)
 		return false
 	}
 	defer resp.Body.Close()
@@ -126,7 +138,7 @@ func ValidateCaptcha(turnstile string) bool {
 	var response models.TurnstileResponse
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("Turnstile response decode error: %v\n", err)
 		return false
 	}
 

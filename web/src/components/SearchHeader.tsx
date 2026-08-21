@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Sparkles, ArrowRight, X, History, Trash2 } from 'lucide-react';
 import { SearchHistoryItem } from '../types';
+import { TurnstileWidget } from './TurnstileWidget';
 import { useLanguage } from '../i18n/LanguageContext';
 
 interface SearchHeaderProps {
@@ -31,6 +32,7 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
 }) => {
   const { t } = useLanguage();
   const [showHistory, setShowHistory] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,6 +166,14 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
             </div>
           )}
         </form>
+
+        {/* Cloudflare Turnstile CAPTCHA for Single Lookup */}
+        <div className="mt-3 flex justify-center">
+          <TurnstileWidget
+            onVerify={token => setTurnstileToken(token)}
+            onExpire={() => setTurnstileToken('')}
+          />
+        </div>
 
         {/* Quick Sample Queries */}
         <div className="mt-3 sm:mt-4 flex items-center flex-wrap gap-1.5 sm:gap-2 text-xs">

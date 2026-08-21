@@ -5,6 +5,7 @@ import { downloadText } from '../utils/helpers';
 import { getCountryName } from '../utils/countries';
 import { getRouteUrl } from '../utils/router';
 import { FlagIcon } from './FlagIcon';
+import { TurnstileWidget } from './TurnstileWidget';
 import { useLanguage } from '../i18n/LanguageContext';
 
 interface BatchInspectorProps {
@@ -25,6 +26,7 @@ export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle 
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<BatchLookupItemResult[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
 
   const handleRunBatch = async () => {
     const lines = inputText
@@ -120,6 +122,14 @@ export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle 
           placeholder="Paste IP addresses or CIDR prefixes here (e.g. 1.1.1.1, 8.8.8.8, 193.0.0.0/21)..."
           className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl text-xs sm:text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 leading-relaxed"
         />
+
+        {/* Cloudflare Turnstile Captcha */}
+        <div className="mt-4 flex justify-center">
+          <TurnstileWidget
+            onVerify={token => setTurnstileToken(token)}
+            onExpire={() => setTurnstileToken('')}
+          />
+        </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <span className="text-xs text-slate-400">

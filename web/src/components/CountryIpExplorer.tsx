@@ -27,6 +27,7 @@ import { ALL_COUNTRIES, POPULAR_COUNTRIES, getCountryDetails } from '../utils/co
 import { copyToClipboard, downloadText } from '../utils/helpers';
 import { generateFirewallConfig } from '../utils/formatters';
 import { getRouteUrl } from '../utils/router';
+import { TurnstileWidget } from './TurnstileWidget';
 import { useLanguage } from '../i18n/LanguageContext';
 
 interface CountryIpExplorerProps {
@@ -44,6 +45,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   const [selectedCountry, setSelectedCountry] = useState<string>(initialCountry.toUpperCase());
   const [countrySearchQuery, setCountrySearchQuery] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
 
   const [data, setData] = useState<CountryIpResource | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -639,6 +641,14 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
             <div className="relative rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs text-slate-200 overflow-x-auto max-h-60 overflow-y-auto leading-relaxed selection:bg-cyan-500/40">
               <pre className="whitespace-pre">{generatedScript.text}</pre>
             </div>
+          </div>
+
+          {/* Cloudflare Turnstile CAPTCHA */}
+          <div className="pt-2 flex justify-center border-t border-slate-800/60">
+            <TurnstileWidget
+              onVerify={token => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken('')}
+            />
           </div>
 
         </div>
