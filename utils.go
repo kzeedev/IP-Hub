@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"plugin"
@@ -120,15 +121,12 @@ func ValidateCaptcha(turnstile string) bool {
 		return false
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
-	var data = strings.NewReader(fmt.Sprintf("secret=%s&response=%s", secret, turnstile))
-	req, err := http.NewRequest("POST", "https://challenges.cloudflare.com/turnstile/v0/siteverify", data)
-	if err != nil {
-		log.Printf("Turnstile request creation error: %v\n", err)
-		return false
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := client.Do(req)
+	form := url.Values{}
+	form.Set("secret", secret)
+	form.Set("response", turnstile)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.PostForm("https://challenges.cloudflare.com/turnstile/v0/siteverify", form)
 	if err != nil {
 		log.Printf("Turnstile verification HTTP error: %v\n", err)
 		return false
@@ -136,10 +134,13 @@ func ValidateCaptcha(turnstile string) bool {
 	defer resp.Body.Close()
 
 	var response models.TurnstileResponse
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		log.Printf("Turnstile response decode error: %v\n", err)
 		return false
+	}
+
+	if !response.Success && len(response.ErrorCodes) > 0 {
+		log.Printf("Turnstile verification failed with error codes: %v\n", response.ErrorCodes)
 	}
 
 	return response.Success

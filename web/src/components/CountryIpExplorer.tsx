@@ -380,6 +380,14 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
           </div>
         </div>
 
+        {/* Cloudflare Turnstile CAPTCHA */}
+        <div className="pt-3 flex justify-center border-t border-slate-800/80">
+          <TurnstileWidget
+            onVerify={token => setTurnstileToken(token)}
+            onExpire={() => setTurnstileToken('')}
+          />
+        </div>
+
         {/* Popular Country Chips */}
         <div className="mt-5 pt-4 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto pb-1 text-xs">
           <span className="text-slate-400 font-semibold text-[11px] uppercase tracking-wider shrink-0 mr-1">
@@ -643,13 +651,6 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
             </div>
           </div>
 
-          {/* Cloudflare Turnstile CAPTCHA */}
-          <div className="pt-2 flex justify-center border-t border-slate-800/60">
-            <TurnstileWidget
-              onVerify={token => setTurnstileToken(token)}
-              onExpire={() => setTurnstileToken('')}
-            />
-          </div>
 
         </div>
       )}
