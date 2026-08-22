@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	minifier "github.com/beyer-stefan/gofiber-minifier"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cache"
 	"github.com/gofiber/fiber/v3/middleware/compress"
@@ -68,16 +67,6 @@ func init() {
 	app.Use("/lookup", limiter.New(limiter.Config{
 		Max:        100,
 		Expiration: 1 * time.Minute,
-	}))
-
-	// Configure minifier
-	app.Use(minifier.New(minifier.Config{
-		MinifyHTML:       true,
-		MinifyCSS:        true,
-		MinifyJS:         true,
-		MinifyJSON:       true,
-		MinifyXML:        true,
-		SuppressWarnings: true,
 	}))
 
 	// Configure cache for static assets
