@@ -13,10 +13,11 @@ import (
 	"strings"
 	"time"
 
-	country "github.com/mikekonan/go-countries"
+	"github.com/gofiber/fiber/v3"
 	"github.com/kzeedev/IP-Hub/config"
 	"github.com/kzeedev/IP-Hub/models"
 	"github.com/kzeedev/IP-Hub/pluginBase"
+	country "github.com/mikekonan/go-countries"
 )
 
 func lookup(countryCode string) pluginBase.Lookup {
@@ -110,6 +111,7 @@ func loadPlugins() {
 	}
 }
 
+// ValidateCaptcha sends the Cloudflare Turnstile token to the siteverify API
 func ValidateCaptcha(turnstile string) bool {
 	if turnstile == "" {
 		return false
@@ -144,4 +146,44 @@ func ValidateCaptcha(turnstile string) bool {
 	}
 
 	return response.Success
+}
+
+// ExtractTurnstileToken extracts the Cloudflare Turnstile token from request headers, query parameters, or JSON body
+func ExtractTurnstileToken(c fiber.Ctx) string {
+	token := c.Get("CF-Turnstile-Response")
+	if token == "" {
+		token = c.Get("X-Turnstile-Token")
+	}
+	if token == "" {
+		token = c.Query("cf-turnstile-response")
+	}
+	if token == "" {
+		token = c.Query("turnstile")
+	}
+	if token == "" {
+		var body struct {
+			Turnstile string `json:"cf-turnstile-response"`
+			Token     string `json:"turnstile"`
+		}
+		_ = json.Unmarshal(c.Body(), &body)
+		if body.Turnstile != "" {
+			token = body.Turnstile
+		} else if body.Token != "" {
+			token = body.Token
+		}
+	}
+	return strings.TrimSpace(token)
+}
+
+// CaptchaMiddleware returns a Fiber handler that enforces valid Turnstile CAPTCHA verification
+func CaptchaMiddleware() fiber.Handler {
+	return func(c fiber.Ctx) error {
+		token := ExtractTurnstileToken(c)
+		if !ValidateCaptcha(token) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Captcha validation failed",
+			})
+		}
+		return c.Next()
+	}
 }

@@ -43,7 +43,10 @@ export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle 
       const res = await fetch('/api/whois/batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: lines.slice(0, 50) }),
+        body: JSON.stringify({
+          items: lines.slice(0, 50),
+          'cf-turnstile-response': turnstileToken,
+        }),
       });
 
       if (!res.ok) {
