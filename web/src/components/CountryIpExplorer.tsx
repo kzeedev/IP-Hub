@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Globe2,
   Search,
@@ -27,7 +27,7 @@ import { ALL_COUNTRIES, POPULAR_COUNTRIES, getCountryDetails } from '../utils/co
 import { copyToClipboard, downloadText } from '../utils/helpers';
 import { generateFirewallConfig } from '../utils/formatters';
 import { getRouteUrl } from '../utils/router';
-import { TurnstileWidget } from './TurnstileWidget';
+import { TurnstileWidget, type TurnstileInstance } from './TurnstileWidget';
 import { useLanguage } from '../i18n/LanguageContext';
 
 interface CountryIpExplorerProps {
@@ -46,6 +46,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   const [countrySearchQuery, setCountrySearchQuery] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const turnstileRef = useRef<TurnstileInstance>(null);
 
   const [data, setData] = useState<CountryIpResource | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -74,13 +75,21 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   const [isTableCopied, setIsTableCopied] = useState<boolean>(false);
 
   // Fetch country data from backend
-  const fetchCountryData = async (code: string) => {
+  const fetchCountryData = async (code: string, token?: string) => {
     setIsLoading(true);
     setError(null);
     setPage(1);
 
     try {
-      const res = await fetch(`/api/whois/country/${encodeURIComponent(code)}`);
+      const activeToken = token || turnstileToken;
+      const res = await fetch('/api/whois/country', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          'cf-turnstile-response': activeToken || '',
+        }),
+      });
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
         throw new Error(errJson.error || `Failed to fetch resources for country ${code}`);
@@ -103,6 +112,12 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
       setData(null);
     } finally {
       setIsLoading(false);
+      setTurnstileToken('');
+      try {
+        turnstileRef.current?.reset();
+      } catch {
+        // ignore
+      }
     }
   };
 
@@ -383,6 +398,8 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
         {/* Cloudflare Turnstile CAPTCHA */}
         <div className="pt-3 flex justify-center border-t border-slate-800/80">
           <TurnstileWidget
+            ref={turnstileRef}
+            action="country"
             onVerify={token => setTurnstileToken(token)}
             onExpire={() => setTurnstileToken('')}
           />

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -111,41 +112,100 @@ func loadPlugins() {
 	}
 }
 
-// ValidateCaptcha sends the Cloudflare Turnstile token to the siteverify API
-func ValidateCaptcha(turnstile string) bool {
-	if turnstile == "" {
+// isPublicIP checks if an IP is a valid routable public IP
+func isPublicIP(ipStr string) bool {
+	ip := net.ParseIP(strings.TrimSpace(ipStr))
+	if ip == nil {
+		return false
+	}
+	return !ip.IsLoopback() && !ip.IsPrivate() && !ip.IsUnspecified() && !ip.IsLinkLocalUnicast() && !ip.IsLinkLocalMulticast()
+}
+
+// ExtractClientIP extracts the real client IP from Cloudflare or standard proxy headers
+func ExtractClientIP(c fiber.Ctx) string {
+	ip := c.Get("CF-Connecting-IP")
+	if ip == "" {
+		ip = c.Get("X-Forwarded-For")
+	}
+	if ip == "" {
+		ip = c.Get("X-Real-IP")
+	}
+	if ip == "" {
+		ip = c.IP()
+	}
+	if strings.Contains(ip, ",") {
+		ip = strings.TrimSpace(strings.Split(ip, ",")[0])
+	}
+	return strings.TrimPrefix(ip, "::ffff:")
+}
+
+// ValidateCaptchaFull verifies a Cloudflare Turnstile token with action, hostname, and remote IP checks
+func ValidateCaptchaFull(turnstile string, expectedAction string, remoteIP string) bool {
+	turnstile = strings.TrimSpace(turnstile)
+	if turnstile == "" || len(turnstile) > 2048 {
+		log.Println("[Turnstile] Validation rejected: empty token or token length > 2048")
 		return false
 	}
 
 	secret := strings.TrimSpace(os.Getenv("TURNSTILE_SECRET"))
 	if secret == "" {
-		log.Println("Error: TURNSTILE_SECRET environment variable is not set")
+		log.Println("[Turnstile] Error: TURNSTILE_SECRET environment variable is not set")
 		return false
 	}
 
 	form := url.Values{}
 	form.Set("secret", secret)
 	form.Set("response", turnstile)
+	if remoteIP != "" && isPublicIP(remoteIP) {
+		form.Set("remoteip", remoteIP)
+	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.PostForm("https://challenges.cloudflare.com/turnstile/v0/siteverify", form)
 	if err != nil {
-		log.Printf("Turnstile verification HTTP error: %v\n", err)
+		log.Printf("[Turnstile] Verification HTTP error: %v\n", err)
 		return false
 	}
 	defer resp.Body.Close()
 
 	var response models.TurnstileResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		log.Printf("Turnstile response decode error: %v\n", err)
+		log.Printf("[Turnstile] Response decode error: %v\n", err)
 		return false
 	}
 
-	if !response.Success && len(response.ErrorCodes) > 0 {
-		log.Printf("Turnstile verification failed with error codes: %v\n", response.ErrorCodes)
+	if !response.Success {
+		log.Printf("[Turnstile] Verification failed from Cloudflare siteverify: error-codes=%v\n", response.ErrorCodes)
+		return false
 	}
 
-	return response.Success
+	// Validate expected action if specified and returned
+	if expectedAction != "" && response.Action != "" && response.Action != expectedAction {
+		log.Printf("[Turnstile] Action mismatch: got %q, expected %q\n", response.Action, expectedAction)
+		return false
+	}
+
+	// Validate expected hostname if TURNSTILE_HOSTNAMES is configured in env
+	if hostnamesEnv := strings.TrimSpace(os.Getenv("TURNSTILE_HOSTNAMES")); hostnamesEnv != "" {
+		allowedHostnames := make(map[string]bool)
+		for _, h := range strings.Split(hostnamesEnv, ",") {
+			if trimmed := strings.TrimSpace(h); trimmed != "" {
+				allowedHostnames[trimmed] = true
+			}
+		}
+		if len(allowedHostnames) > 0 && response.Hostname != "" && !allowedHostnames[response.Hostname] {
+			log.Printf("[Turnstile] Hostname mismatch: got %q, not in allowed list\n", response.Hostname)
+			return false
+		}
+	}
+
+	log.Printf("[Turnstile] Token verified successfully (hostname=%q, action=%q)\n", response.Hostname, response.Action)
+	return true
+}
+
+// ValidateCaptcha validates a token using default parameters
+func ValidateCaptcha(turnstile string) bool {
+	return ValidateCaptchaFull(turnstile, "", "")
 }
 
 // ExtractTurnstileToken extracts the Cloudflare Turnstile token from request headers, query parameters, or JSON body
@@ -176,10 +236,15 @@ func ExtractTurnstileToken(c fiber.Ctx) string {
 }
 
 // CaptchaMiddleware returns a Fiber handler that enforces valid Turnstile CAPTCHA verification
-func CaptchaMiddleware() fiber.Handler {
+func CaptchaMiddleware(expectedAction ...string) fiber.Handler {
+	var action string
+	if len(expectedAction) > 0 {
+		action = expectedAction[0]
+	}
 	return func(c fiber.Ctx) error {
 		token := ExtractTurnstileToken(c)
-		if !ValidateCaptcha(token) {
+		clientIP := ExtractClientIP(c)
+		if !ValidateCaptchaFull(token, action, clientIP) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "Captcha validation failed",
 			})

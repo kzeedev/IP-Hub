@@ -106,7 +106,7 @@ export default function App() {
   };
 
   // Lookup action with optional URL history push
-  const performLookup = async (targetQuery: string, updateUrl = true) => {
+  const performLookup = async (targetQuery: string, updateUrl = true, token?: string) => {
     const cleanQuery = targetQuery.trim();
     if (!cleanQuery) return;
 
@@ -120,7 +120,14 @@ export default function App() {
     }
 
     try {
-      const res = await fetch(`/api/whois/lookup/${encodeURIComponent(cleanQuery)}`);
+      const res = await fetch('/api/whois/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: cleanQuery,
+          'cf-turnstile-response': token || '',
+        }),
+      });
       if (!res.ok) {
         const errorJson = await res.json().catch(() => ({}));
         throw new Error(errorJson.error || `Server responded with status ${res.status}`);
@@ -321,7 +328,7 @@ export default function App() {
           <SearchHeader
             query={query}
             setQuery={setQuery}
-            onSearch={(q) => performLookup(q, true)}
+            onSearch={(q, token) => performLookup(q, true, token)}
             isLoading={isLoading}
             history={searchHistory}
             onClearHistory={handleClearHistory}

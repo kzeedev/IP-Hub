@@ -82,9 +82,8 @@ func init() {
 	// Native Go WHOIS API Endpoints
 	api := app.Group("/api/whois")
 	api.Get("/myip", handleWhoisMyIp)
-	api.Get("/lookup/*", handleWhoisLookup)
-	api.Get("/lookup", handleWhoisLookup)
-	api.Get("/country/:code", handleWhoisCountry)
+	api.Post("/lookup", handleWhoisLookup)
+	api.Post("/country", handleWhoisCountry)
 	api.Post("/resolve-orgs", handleWhoisResolveOrgs)
 	api.Post("/batch", handleWhoisBatch)
 	api.Get("/subnet", handleWhoisSubnet)

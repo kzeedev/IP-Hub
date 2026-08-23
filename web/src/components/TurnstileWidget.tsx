@@ -1,8 +1,11 @@
 import React, { forwardRef } from 'react';
 import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 
+export type { TurnstileInstance };
+
 export interface TurnstileWidgetProps {
   siteKey?: string;
+  action?: string;
   onVerify: (token: string) => void;
   onExpire?: () => void;
   onError?: (error?: string) => void;
@@ -14,7 +17,8 @@ export interface TurnstileWidgetProps {
 export const TurnstileWidget = forwardRef<TurnstileInstance | undefined, TurnstileWidgetProps>(
   (
     {
-      siteKey = (import.meta as any).env?.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAABcvDCSrxIuannn_',
+      siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAABcvDCSrxIuannn_',
+      action,
       onVerify,
       onExpire,
       onError,
@@ -33,6 +37,7 @@ export const TurnstileWidget = forwardRef<TurnstileInstance | undefined, Turnsti
           onExpire={onExpire}
           onError={onError}
           options={{
+            action: action,
             theme: theme,
             size: 'normal',
           }}

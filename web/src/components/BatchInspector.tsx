@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ListPlus, Play, Download, Trash2, ExternalLink } from 'lucide-react';
 import { BatchLookupItemResult } from '../types';
 import { downloadText } from '../utils/helpers';
 import { getCountryName } from '../utils/countries';
 import { getRouteUrl } from '../utils/router';
 import { FlagIcon } from './FlagIcon';
-import { TurnstileWidget } from './TurnstileWidget';
+import { TurnstileWidget, type TurnstileInstance } from './TurnstileWidget';
 import { useLanguage } from '../i18n/LanguageContext';
 
 interface BatchInspectorProps {
-  onInspectSingle: (ip: string) => void;
+  onInspectSingle: (query: string) => void;
 }
 
 const DEFAULT_BATCH = `193.0.6.139
@@ -27,6 +27,7 @@ export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle 
   const [results, setResults] = useState<BatchLookupItemResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const turnstileRef = useRef<TurnstileInstance>(null);
 
   const handleRunBatch = async () => {
     const lines = inputText
@@ -60,6 +61,12 @@ export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle 
       setError(err.message || 'Failed to execute batch lookup.');
     } finally {
       setIsLoading(false);
+      setTurnstileToken('');
+      try {
+        turnstileRef.current?.reset();
+      } catch {
+        // ignore
+      }
     }
   };
 
@@ -129,6 +136,8 @@ export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle 
         {/* Cloudflare Turnstile Captcha */}
         <div className="mt-4 flex justify-center">
           <TurnstileWidget
+            ref={turnstileRef}
+            action="batch"
             onVerify={token => setTurnstileToken(token)}
             onExpire={() => setTurnstileToken('')}
           />

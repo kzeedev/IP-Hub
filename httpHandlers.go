@@ -690,7 +690,12 @@ func handleRequest(c fiber.Ctx) error {
 		})
 	}
 
-	if !ValidateCaptcha(request.Turnstile) {
+	token := request.Turnstile
+	if token == "" {
+		token = ExtractTurnstileToken(c)
+	}
+
+	if !ValidateCaptchaFull(token, "lookup", ExtractClientIP(c)) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Captcha validation failed",
 		})
@@ -734,38 +739,25 @@ func handleRequest(c fiber.Ctx) error {
 	return c.JSON(info)
 }
 
-// WHOIS Single Lookup (GET /api/whois/lookup/*)
+// WHOIS Single Lookup (POST /api/whois/lookup)
 func handleWhoisLookup(c fiber.Ctx) error {
-	turnstileToken := c.Get("CF-Turnstile-Response")
-	if turnstileToken == "" {
-		turnstileToken = c.Get("X-Turnstile-Token")
+	var body struct {
+		Query     string `json:"query"`
+		Turnstile string `json:"cf-turnstile-response"`
 	}
-	if turnstileToken == "" {
-		turnstileToken = c.Query("cf-turnstile-response")
-	}
-	if turnstileToken != "" && !ValidateCaptcha(turnstileToken) {
+	if err := c.Bind().Body(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	if !ValidateCaptchaFull(body.Turnstile, "lookup", ExtractClientIP(c)) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 			"error": "Captcha validation failed",
 		})
 	}
 
-	resource := strings.TrimSpace(c.Params("resource"))
-	if resource == "" {
-		resource = strings.TrimSpace(c.Params("*"))
-	}
-	if resource == "" {
-		resource = strings.TrimSpace(c.Params("+"))
-	}
-	if resource == "" {
-		resource = strings.TrimSpace(c.Query("q"))
-	}
-	if resource == "" {
-		path := c.Path()
-		if strings.HasPrefix(path, "/api/whois/lookup/") {
-			resource = strings.TrimPrefix(path, "/api/whois/lookup/")
-		}
-	}
-	resource = strings.TrimSpace(resource)
+	resource := strings.TrimSpace(body.Query)
 	if resource == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Missing IP, ASN, or prefix parameter",
@@ -836,19 +828,25 @@ func handleWhoisMyIp(c fiber.Ctx) error {
 	})
 }
 
-// Country Resource Explorer (GET /api/whois/country/:code)
+// Country Resource Explorer (POST /api/whois/country)
 func handleWhoisCountry(c fiber.Ctx) error {
-	turnstileToken := ExtractTurnstileToken(c)
-	if turnstileToken != "" && !ValidateCaptcha(turnstileToken) {
+	var body struct {
+		Code      string `json:"code"`
+		Turnstile string `json:"cf-turnstile-response"`
+	}
+	if err := c.Bind().Body(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	if !ValidateCaptchaFull(body.Turnstile, "country", ExtractClientIP(c)) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 			"error": "Captcha validation failed",
 		})
 	}
 
-	code := strings.ToUpper(strings.TrimSpace(c.Params("code")))
-	if code == "" {
-		code = strings.ToUpper(strings.TrimSpace(c.Query("code")))
-	}
+	code := strings.ToUpper(strings.TrimSpace(body.Code))
 	if code == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Country code required",
@@ -1092,7 +1090,7 @@ func handleWhoisResolveOrgs(c fiber.Ctx) error {
 	if turnstileToken == "" {
 		turnstileToken = ExtractTurnstileToken(c)
 	}
-	if turnstileToken != "" && !ValidateCaptcha(turnstileToken) {
+	if turnstileToken != "" && !ValidateCaptchaFull(turnstileToken, "", ExtractClientIP(c)) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Captcha validation failed",
 		})
@@ -1202,11 +1200,8 @@ func handleWhoisBatch(c fiber.Ctx) error {
 	if turnstileToken == "" {
 		turnstileToken = body.Token
 	}
-	if turnstileToken == "" {
-		turnstileToken = ExtractTurnstileToken(c)
-	}
-	if turnstileToken != "" && !ValidateCaptcha(turnstileToken) {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+	if !ValidateCaptchaFull(turnstileToken, "batch", ExtractClientIP(c)) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 			"error": "Captcha validation failed",
 		})
 	}

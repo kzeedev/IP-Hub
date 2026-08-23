@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Search, Sparkles, ArrowRight, X, History, Trash2 } from 'lucide-react';
 import { SearchHistoryItem } from '../types';
-import { TurnstileWidget } from './TurnstileWidget';
+import { TurnstileWidget, type TurnstileInstance } from './TurnstileWidget';
 import { useLanguage } from '../i18n/LanguageContext';
 
 interface SearchHeaderProps {
   query: string;
   setQuery: (q: string) => void;
-  onSearch: (q: string) => void;
+  onSearch: (q: string, token?: string) => void;
   isLoading: boolean;
   history: SearchHistoryItem[];
   onClearHistory: () => void;
@@ -33,12 +33,19 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
   const { t } = useLanguage();
   const [showHistory, setShowHistory] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const turnstileRef = useRef<TurnstileInstance>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
       setShowHistory(false);
-      onSearch(query.trim());
+      onSearch(query.trim(), turnstileToken);
+      setTurnstileToken('');
+      try {
+        turnstileRef.current?.reset();
+      } catch {
+        // ignore
+      }
     }
   };
 
@@ -57,7 +64,7 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
   return (
     <div className="w-full bg-slate-900 border-b border-slate-800/80 py-5 sm:py-8 px-3 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
-        
+
         {/* Main SEO Title & Subtitle */}
         <div className="text-center mb-4 sm:mb-6">
           <h1 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
@@ -71,7 +78,7 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
         {/* Main Search Input Form */}
         <form onSubmit={handleSubmit} className="relative">
           <div className="relative flex items-center shadow-2xl rounded-2xl overflow-hidden border border-slate-700 bg-slate-800/90 focus-within:border-cyan-500 focus-within:ring-2 focus-within:ring-cyan-500/20 transition-all">
-            
+
             <div className="pl-3 sm:pl-4 pr-1 text-slate-400 flex items-center shrink-0">
               <Search className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
             </div>
@@ -170,6 +177,8 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
         {/* Cloudflare Turnstile CAPTCHA for Single Lookup */}
         <div className="mt-3 flex justify-center">
           <TurnstileWidget
+            ref={turnstileRef}
+            action="lookup"
             onVerify={token => setTurnstileToken(token)}
             onExpire={() => setTurnstileToken('')}
           />
@@ -187,7 +196,13 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
               type="button"
               onClick={() => {
                 setQuery(sample.query);
-                onSearch(sample.query);
+                onSearch(sample.query, turnstileToken);
+                setTurnstileToken('');
+                try {
+                  turnstileRef.current?.reset();
+                } catch {
+                  // ignore
+                }
               }}
               className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition-all text-[11px] sm:text-xs font-mono group"
             >
