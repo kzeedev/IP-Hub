@@ -31,18 +31,16 @@ import { TurnstileWidget, type TurnstileInstance } from './TurnstileWidget';
 import { useLanguage } from '../i18n/LanguageContext';
 
 interface CountryIpExplorerProps {
-  initialCountry?: string;
   onInspectResource: (resource: string) => void;
 }
 
 type TabType = 'ipv4' | 'ipv6' | 'asns';
 
 export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
-  initialCountry = 'IR',
   onInspectResource,
 }) => {
   const { language, t, isRtl } = useLanguage();
-  const [selectedCountry, setSelectedCountry] = useState<string>(initialCountry.toUpperCase());
+  const [selectedCountry, setSelectedCountry] = useState<string>('');
   const [countrySearchQuery, setCountrySearchQuery] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [turnstileToken, setTurnstileToken] = useState<string>('');
@@ -122,7 +120,9 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   };
 
   useEffect(() => {
-    fetchCountryData(selectedCountry);
+    if (selectedCountry) {
+      fetchCountryData(selectedCountry);
+    }
   }, [selectedCountry]);
 
   // Filter countries for dropdown with bilingual name support

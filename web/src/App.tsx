@@ -271,7 +271,6 @@ export default function App() {
       {activeView === 'country-ips' && (
         <main className="flex-1">
           <CountryIpExplorer
-            initialCountry={countryExplorerCountry}
             onInspectResource={(resource) => {
               setQuery(resource);
               handleNavigateView('lookup', { query: resource });
