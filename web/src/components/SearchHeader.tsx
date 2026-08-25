@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Search, Sparkles, ArrowRight, X, History, Trash2 } from 'lucide-react';
 import { SearchHistoryItem } from '../types';
 import { TurnstileWidget, type TurnstileInstance } from './TurnstileWidget';
@@ -34,6 +34,25 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
   const [showHistory, setShowHistory] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string>('');
   const turnstileRef = useRef<TurnstileInstance>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (formRef.current && !formRef.current.contains(event.target as Node)) {
+        setShowHistory(false);
+      }
+    };
+
+    if (showHistory) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [showHistory]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,7 +95,7 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
         </div>
 
         {/* Main Search Input Form */}
-        <form onSubmit={handleSubmit} className="relative">
+        <form ref={formRef} onSubmit={handleSubmit} className="relative">
           <div className="relative flex items-center shadow-2xl rounded-2xl overflow-hidden border border-slate-700 bg-slate-800/90 focus-within:border-cyan-500 focus-within:ring-2 focus-within:ring-cyan-500/20 transition-all">
 
             <div className="pl-3 sm:pl-4 pr-1 text-slate-400 flex items-center shrink-0">
@@ -90,6 +109,7 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
               onChange={e => setQuery(e.target.value)}
               onFocus={() => setShowHistory(true)}
               placeholder={t.search.placeholder}
+              autoComplete="off"
               className="w-full py-3 sm:py-4 px-2 text-xs sm:text-base bg-transparent text-white placeholder-slate-400 focus:outline-none font-mono"
             />
 
@@ -139,14 +159,25 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
                   <History className="w-3.5 h-3.5 text-cyan-400" />
                   {t.search.historyTitle}
                 </span>
-                <button
-                  type="button"
-                  onClick={onClearHistory}
-                  className="flex items-center gap-1 text-[11px] text-red-400 hover:text-red-300"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  {t.search.clearHistory}
-                </button>
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={onClearHistory}
+                    className="flex items-center gap-1 text-[11px] text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    {t.search.clearHistory}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowHistory(false)}
+                    className="p-1 rounded-md hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+                    title="Close"
+                    aria-label="Close history"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
               <div className="max-h-48 overflow-y-auto space-y-0.5">
                 {history.map((item, idx) => (
@@ -156,7 +187,6 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
                     onClick={() => {
                       setQuery(item.query);
                       setShowHistory(false);
-                      onSearch(item.query);
                     }}
                     className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-700/60 flex items-center justify-between text-xs text-slate-200 transition-colors group"
                   >

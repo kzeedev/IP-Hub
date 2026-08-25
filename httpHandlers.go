@@ -109,22 +109,24 @@ func computeSubnet(input string, customCidr *int) *models.SubnetBreakdown {
 
 		total := int64(1) << (32 - prefix)
 		var usable int64
-		if prefix == 31 {
+		switch prefix {
+		case 31:
 			usable = 2
-		} else if prefix == 32 {
+		case 32:
 			usable = 1
-		} else {
+		default:
 			usable = total - 2
 		}
 
 		var firstUsable, lastUsable string
-		if prefix == 32 {
+		switch prefix {
+		case 32:
 			firstUsable = ip4.String()
 			lastUsable = ip4.String()
-		} else if prefix == 31 {
+		case 31:
 			firstUsable = netIP.String()
 			lastUsable = bcastIP.String()
-		} else {
+		default:
 			firstIP := make(net.IP, 4)
 			binary.BigEndian.PutUint32(firstIP, netUint+1)
 			firstUsable = firstIP.String()
@@ -216,9 +218,7 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 	)
 
 	// 1. RIPE DB REST API Query
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		var restRes struct {
 			Objects struct {
 				Object []struct {
@@ -247,11 +247,11 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 				if len(obj.PrimaryKey.Attribute) > 0 {
 					pk = obj.PrimaryKey.Attribute[0].Value
 				}
-				b.WriteString(fmt.Sprintf("%% Object: %s %s\n", obj.Type, pk))
+				fmt.Fprintf(&b, "%% Object: %s %s\n", obj.Type, pk)
 				var attrs []models.RipeAttribute
 				for _, a := range obj.Attributes.Attribute {
 					attrs = append(attrs, models.RipeAttribute{Name: a.Name, Value: a.Value, Comment: a.Comment})
-					b.WriteString(fmt.Sprintf("%-16s: %s\n", a.Name, a.Value))
+					fmt.Fprintf(&b, "%-16s: %s\n", a.Name, a.Value)
 				}
 				b.WriteString("\n")
 				objects = append(objects, models.RipeObject{
@@ -262,55 +262,142 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 			}
 			rawWhoisTxt = b.String()
 		}
-	}()
+	})
 
 	// 2. RIPEstat Geolocation
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
+		var parseCoord = func(v interface{}) (float64, bool) {
+			if v == nil {
+				return 0, false
+			}
+			switch val := v.(type) {
+			case float64:
+				return val, true
+			case float32:
+				return float64(val), true
+			case int:
+				return float64(val), true
+			case int64:
+				return float64(val), true
+			case string:
+				f, err := strconv.ParseFloat(strings.TrimSpace(val), 64)
+				return f, err == nil
+			}
+			return 0, false
+		}
+
 		var geoRes struct {
 			Data struct {
-				Locations []struct {
-					Country     string      `json:"country"`
-					CountryName string      `json:"country_name"`
-					City        string      `json:"city"`
-					State       string      `json:"state"`
-					Latitude    interface{} `json:"latitude"`
-					Longitude   interface{} `json:"longitude"`
-					Timezone    string      `json:"timezone"`
-					Prefix      string      `json:"prefix"`
-				} `json:"locations"`
+				LocatedResources []struct {
+					Resource  string `json:"resource"`
+					Locations []struct {
+						Country           string      `json:"country"`
+						CountryName       string      `json:"country_name"`
+						City              string      `json:"city"`
+						State             string      `json:"state"`
+						Latitude          interface{} `json:"latitude"`
+						Longitude         interface{} `json:"longitude"`
+						Timezone          string      `json:"timezone"`
+						Prefix            string      `json:"prefix"`
+						Resources         []string    `json:"resources"`
+						CoveredPercentage float64     `json:"covered_percentage"`
+					} `json:"locations"`
+				} `json:"located_resources"`
 			} `json:"data"`
 		}
 		u := fmt.Sprintf("https://stat.ripe.net/data/geoloc/data.json?resource=%s", url.QueryEscape(query))
-		if err := fetchJSON(u, &geoRes); err == nil && len(geoRes.Data.Locations) > 0 {
-			loc := geoRes.Data.Locations[0]
-			geoLoc.Country = loc.CountryName
-			if geoLoc.Country == "" {
-				geoLoc.Country = loc.Country
-			}
-			geoLoc.CountryCode = strings.ToUpper(loc.Country)
-			geoLoc.City = loc.City
-			geoLoc.Region = loc.State
-			geoLoc.Timezone = loc.Timezone
-			geoLoc.Prefix = loc.Prefix
+		if err := fetchJSON(u, &geoRes); err == nil && len(geoRes.Data.LocatedResources) > 0 {
+			for _, item := range geoRes.Data.LocatedResources {
+				if len(item.Locations) > 0 {
+					loc := item.Locations[0]
+					if loc.Country != "" {
+						geoLoc.CountryCode = strings.ToUpper(strings.TrimSpace(loc.Country))
+					}
+					if loc.CountryName != "" {
+						geoLoc.Country = strings.TrimSpace(loc.CountryName)
+					} else if geoLoc.CountryCode != "" && geoLoc.CountryCode != "XX" {
+						if cName, ok := country.ByAlpha2Code(country.Alpha2Code(geoLoc.CountryCode)); ok {
+							geoLoc.Country = cName.NameStr()
+						}
+					}
+					if loc.City != "" {
+						geoLoc.City = strings.TrimSpace(loc.City)
+					}
+					if loc.State != "" {
+						geoLoc.Region = strings.TrimSpace(loc.State)
+					}
+					if loc.Timezone != "" {
+						geoLoc.Timezone = strings.TrimSpace(loc.Timezone)
+					}
+					if loc.Prefix != "" {
+						geoLoc.Prefix = strings.TrimSpace(loc.Prefix)
+					} else if len(loc.Resources) > 0 {
+						geoLoc.Prefix = strings.TrimSpace(loc.Resources[0])
+					} else if item.Resource != "" {
+						geoLoc.Prefix = strings.TrimSpace(item.Resource)
+					}
 
-			var lat, lon float64
-			if v, ok := loc.Latitude.(float64); ok {
-				lat = v
-				geoLoc.Latitude = &lat
-			}
-			if v, ok := loc.Longitude.(float64); ok {
-				lon = v
-				geoLoc.Longitude = &lon
+					lat, okLat := parseCoord(loc.Latitude)
+					lon, okLon := parseCoord(loc.Longitude)
+					if okLat && okLon {
+						geoLoc.Latitude = &lat
+						geoLoc.Longitude = &lon
+					}
+					break
+				}
 			}
 		}
-	}()
+
+		// Fallback to maxmind-geo-lite if geoloc endpoint had no locations or missing coordinates
+		if geoLoc.Latitude == nil || geoLoc.CountryCode == "" || geoLoc.CountryCode == "XX" {
+			var mmRes struct {
+				Data struct {
+					LocatedResources []struct {
+						Resource  string `json:"resource"`
+						Locations []struct {
+							Country   string      `json:"country"`
+							City      string      `json:"city"`
+							Latitude  interface{} `json:"latitude"`
+							Longitude interface{} `json:"longitude"`
+							Resources []string    `json:"resources"`
+						} `json:"locations"`
+					} `json:"located_resources"`
+				} `json:"data"`
+			}
+			uMax := fmt.Sprintf("https://stat.ripe.net/data/maxmind-geo-lite/data.json?resource=%s", url.QueryEscape(query))
+			if err := fetchJSON(uMax, &mmRes); err == nil && len(mmRes.Data.LocatedResources) > 0 {
+				for _, item := range mmRes.Data.LocatedResources {
+					if len(item.Locations) > 0 {
+						loc := item.Locations[0]
+						if (geoLoc.CountryCode == "" || geoLoc.CountryCode == "XX") && loc.Country != "" {
+							geoLoc.CountryCode = strings.ToUpper(strings.TrimSpace(loc.Country))
+							if cName, ok := country.ByAlpha2Code(country.Alpha2Code(geoLoc.CountryCode)); ok {
+								geoLoc.Country = cName.NameStr()
+							}
+						}
+						if geoLoc.City == "" && loc.City != "" {
+							geoLoc.City = strings.TrimSpace(loc.City)
+						}
+						if geoLoc.Prefix == "" && len(loc.Resources) > 0 {
+							geoLoc.Prefix = strings.TrimSpace(loc.Resources[0])
+						}
+						if geoLoc.Latitude == nil {
+							lat, okLat := parseCoord(loc.Latitude)
+							lon, okLon := parseCoord(loc.Longitude)
+							if okLat && okLon {
+								geoLoc.Latitude = &lat
+								geoLoc.Longitude = &lon
+							}
+						}
+						break
+					}
+				}
+			}
+		}
+	})
 
 	// 3. Routing Status
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		var routRes struct {
 			Data struct {
 				Prefix    string `json:"prefix"`
@@ -347,12 +434,10 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 			}
 			routing.LastUpdated = routRes.Data.LastUpdated
 		}
-	}()
+	})
 
 	// 4. Abuse Contact Finder
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		var abuseRes struct {
 			Data struct {
 				AbuseContacts []string `json:"abuse_contacts"`
@@ -362,24 +447,20 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 		if err := fetchJSON(u, &abuseRes); err == nil && len(abuseRes.Data.AbuseContacts) > 0 {
 			abuseEmail = abuseRes.Data.AbuseContacts[0]
 		}
-	}()
+	})
 
 	// 5. Reverse DNS
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		if !strings.Contains(query, "/") {
 			names, err := net.LookupAddr(query)
 			if err == nil && len(names) > 0 {
 				reverseDns = strings.TrimSuffix(names[0], ".")
 			}
 		}
-	}()
+	})
 
 	// 6. Network Info
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		var netRes struct {
 			Data struct {
 				Prefix string   `json:"prefix"`
@@ -395,7 +476,7 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 				}
 			}
 		}
-	}()
+	})
 
 	wg.Wait()
 
@@ -422,7 +503,7 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 				objType := "inetnum"
 				for _, r := range grp {
 					attrs = append(attrs, models.RipeAttribute{Name: r.Key, Value: r.Value})
-					b.WriteString(fmt.Sprintf("%-16s: %s\n", r.Key, r.Value))
+					fmt.Fprintf(&b, "%-16s: %s\n", r.Key, r.Value)
 					kLow := strings.ToLower(r.Key)
 					if kLow == "inetnum" || kLow == "inet6num" || kLow == "netrange" || kLow == "aut-num" {
 						pk = r.Value
@@ -543,6 +624,19 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 	if countryCode != "XX" && countryCode != "" {
 		if cName, ok := country.ByAlpha2Code(country.Alpha2Code(countryCode)); ok {
 			countryStr = cName.NameStr()
+		}
+	}
+
+	// Synchronize GeoLocation country if missing or XX
+	if geoLoc.CountryCode == "" || geoLoc.CountryCode == "XX" {
+		geoLoc.CountryCode = countryCode
+	}
+	if geoLoc.Country == "" || geoLoc.Country == "Unknown" {
+		geoLoc.Country = countryStr
+	}
+	if geoLoc.CountryCode != "" && geoLoc.CountryCode != "XX" && (geoLoc.Country == "" || geoLoc.Country == "Unknown") {
+		if cName, ok := country.ByAlpha2Code(country.Alpha2Code(geoLoc.CountryCode)); ok {
+			geoLoc.Country = cName.NameStr()
 		}
 	}
 
@@ -982,10 +1076,7 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 
 	const asnChunkSize = 50
 	for i := 0; i < len(missingAsns); i += asnChunkSize {
-		end := i + asnChunkSize
-		if end > len(missingAsns) {
-			end = len(missingAsns)
-		}
+		end := min(i+asnChunkSize, len(missingAsns))
 		chunk := missingAsns[i:end]
 
 		var asRes struct {
@@ -1041,9 +1132,7 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 	var wg sync.WaitGroup
 
 	for range workerCount {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for prefix := range prefixChan {
 				var pRes struct {
 					Data struct {
@@ -1068,7 +1157,7 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 				}
 				time.Sleep(30 * time.Millisecond)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 }
@@ -1158,9 +1247,7 @@ func handleWhoisResolveOrgs(c fiber.Ctx) error {
 
 	for _, p := range missingPrefixes {
 		prefix := p
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			var pRes struct {
 				Data struct {
 					Asns []struct {
@@ -1176,7 +1263,7 @@ func handleWhoisResolveOrgs(c fiber.Ctx) error {
 				mu.Unlock()
 				_ = database.SetJSON("prefix_org_"+prefix, holder, dailyTtl)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -1217,9 +1304,7 @@ func handleWhoisBatch(c fiber.Ctx) error {
 	for i, item := range items {
 		idx := i
 		target := strings.TrimSpace(item)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			rec, err := executeIpLookup(target)
 			if err != nil {
 				results[idx] = models.BatchItemResult{
@@ -1240,7 +1325,7 @@ func handleWhoisBatch(c fiber.Ctx) error {
 				OriginAsn:   rec.Routing.OriginAsn,
 				AbuseEmail:  rec.AbuseContact.Email,
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
