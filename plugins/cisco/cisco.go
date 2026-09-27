@@ -30,24 +30,24 @@ func (p *CiscoPlugin) Format(data pluginBase.Lookup, ipVersion pluginBase.IPVers
 		_access = "deny"
 	}
 
-	if ipVersion == "ipv4" || ipVersion == "any" {
+	if ipVersion == pluginBase.IPv4 || ipVersion == pluginBase.Any {
 		for _, ip := range data.IPv4 {
 			IPv4 += fmt.Sprintf("ip access-list %v %s %v\n", data.CountryCode, _access, ip)
 		}
 	}
-	if ipVersion == "ipv6" || ipVersion == "any" {
+	if ipVersion == pluginBase.IPv6 || ipVersion == pluginBase.Any {
 		for _, ip := range data.IPv6 {
 			IPv6 += fmt.Sprintf("ipv6 access-list %v %s any %v any any\n", data.CountryCode, _access, ip)
 		}
 	}
 
 	switch ipVersion {
-	case "ipv4":
+	case pluginBase.IPv4:
 		return fmt.Sprintf(`# Updated at: %v
 # Country: %v
 %v`,
 			data.UpdatedAt, data.CountryName, IPv4)
-	case "ipv6":
+	case pluginBase.IPv6:
 		return fmt.Sprintf(`# Updated at: %v
 # Country: %v
 %v`,

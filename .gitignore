@@ -20,3 +20,4 @@ IP-Hub.exe
 .idea/
 .vscode/
 .localbuilder/
+.gocache/
