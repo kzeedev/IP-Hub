@@ -921,6 +921,23 @@ func handleWhoisCountry(c fiber.Ctx) error {
 		})
 	}
 
+	res, err := executeCountryLookup(code)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{"data": res})
+}
+
+// Core Country Lookup logic
+func executeCountryLookup(code string) (*models.CountryIpResource, error) {
+	code = strings.ToUpper(strings.TrimSpace(code))
+	if code == "" {
+		return nil, fmt.Errorf("country code required")
+	}
+
 	dailyTtl := getEndOfDayTtl()
 	cacheKey := "country_res_" + code
 
@@ -929,7 +946,7 @@ func handleWhoisCountry(c fiber.Ctx) error {
 		cached.Cached = true
 		// Trigger background resolution for any remaining unresolved ISP names if not already running
 		go startBackgroundCountryIspResolution(code, cached.ASNs, cached.IPv4, cached.IPv6)
-		return c.JSON(fiber.Map{"data": cached})
+		return &cached, nil
 	}
 
 	countryName := code
@@ -1025,7 +1042,7 @@ func handleWhoisCountry(c fiber.Ctx) error {
 	// Start background fetching & caching of selected country's ISP / Org names
 	go startBackgroundCountryIspResolution(code, asns, ripeStatRes.Data.Resources.Ipv4, ripeStatRes.Data.Resources.Ipv6)
 
-	return c.JSON(fiber.Map{"data": result})
+	return &result, nil
 }
 
 // Background goroutine to resolve and cache all ASN names and Prefix orgs for a country

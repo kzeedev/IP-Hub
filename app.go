@@ -86,6 +86,9 @@ func init() {
 	// Legacy IP-Hub plugin endpoint
 	app.Post("/lookup", handleRequest)
 
+	// Markdown for Agents content negotiation (RFC 7231 / Cloudflare standard)
+	app.Use(markdownNegotiationMiddleware)
+
 	// Serve Frontend Single Page Application (web/dist/ and web/public/)
 	app.Use("/", static.New("./web/dist"))
 	app.Use("/", static.New("./dist"))
@@ -96,6 +99,7 @@ func init() {
 		if strings.HasPrefix(c.Path(), "/api") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Endpoint not found"})
 		}
+		c.Set("Vary", "Accept")
 		if _, err := os.Stat("./web/dist/index.html"); err == nil {
 			return c.SendFile("./web/dist/index.html")
 		}
