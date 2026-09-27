@@ -5,7 +5,6 @@ import { downloadText } from '../utils/helpers';
 import { getCountryName } from '../utils/countries';
 import { getRouteUrl } from '../utils/router';
 import { FlagIcon } from './FlagIcon';
-import { TurnstileWidget, type TurnstileInstance } from './TurnstileWidget';
 import { useLanguage } from '../i18n/LanguageContext';
 
 interface BatchInspectorProps {
@@ -26,8 +25,6 @@ export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle 
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<BatchLookupItemResult[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [turnstileToken, setTurnstileToken] = useState<string>('');
-  const turnstileRef = useRef<TurnstileInstance>(null);
 
   const handleRunBatch = async () => {
     const lines = inputText
@@ -46,7 +43,6 @@ export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: lines.slice(0, 50),
-          'cf-turnstile-response': turnstileToken,
         }),
       });
 
@@ -61,12 +57,6 @@ export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle 
       setError(err.message || 'Failed to execute batch lookup.');
     } finally {
       setIsLoading(false);
-      setTurnstileToken('');
-      try {
-        turnstileRef.current?.reset();
-      } catch {
-        // ignore
-      }
     }
   };
 
@@ -133,15 +123,6 @@ export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle 
           className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl text-xs sm:text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 leading-relaxed"
         />
 
-        {/* Cloudflare Turnstile Captcha */}
-        <div className="mt-4 flex justify-center">
-          <TurnstileWidget
-            ref={turnstileRef}
-            action="batch"
-            onVerify={token => setTurnstileToken(token)}
-            onExpire={() => setTurnstileToken('')}
-          />
-        </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <span className="text-xs text-slate-400">

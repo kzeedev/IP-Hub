@@ -767,11 +767,10 @@ func executeAsnLookup(rawQuery string) (*models.AsnRecord, error) {
 // -----------------------------------------------------------------------------
 
 type FormRequest struct {
-	Country   string `json:"country"`
-	IPType    string `json:"version"`
-	Format    string `json:"format"`
-	Access    string `json:"access"`
-	Turnstile string `json:"cf-turnstile-response"`
+	Country string `json:"country"`
+	IPType  string `json:"version"`
+	Format  string `json:"format"`
+	Access  string `json:"access"`
 }
 
 // Legacy IP-Hub plugin endpoint (POST /lookup)
@@ -781,17 +780,6 @@ func handleRequest(c fiber.Ctx) error {
 	if err := c.Bind().Body(request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),
-		})
-	}
-
-	token := request.Turnstile
-	if token == "" {
-		token = ExtractTurnstileToken(c)
-	}
-
-	if !ValidateCaptchaFull(token, "lookup", ExtractClientIP(c)) {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Captcha validation failed",
 		})
 	}
 
@@ -836,18 +824,11 @@ func handleRequest(c fiber.Ctx) error {
 // WHOIS Single Lookup (POST /api/whois/lookup)
 func handleWhoisLookup(c fiber.Ctx) error {
 	var body struct {
-		Query     string `json:"query"`
-		Turnstile string `json:"cf-turnstile-response"`
+		Query string `json:"query"`
 	}
 	if err := c.Bind().Body(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
-		})
-	}
-
-	if !ValidateCaptchaFull(body.Turnstile, "lookup", ExtractClientIP(c)) {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"error": "Captcha validation failed",
 		})
 	}
 
@@ -925,18 +906,11 @@ func handleWhoisMyIp(c fiber.Ctx) error {
 // Country Resource Explorer (POST /api/whois/country)
 func handleWhoisCountry(c fiber.Ctx) error {
 	var body struct {
-		Code      string `json:"code"`
-		Turnstile string `json:"cf-turnstile-response"`
+		Code string `json:"code"`
 	}
 	if err := c.Bind().Body(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
-		})
-	}
-
-	if !ValidateCaptchaFull(body.Turnstile, "country", ExtractClientIP(c)) {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"error": "Captcha validation failed",
 		})
 	}
 
@@ -1165,23 +1139,12 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 // Bulk Org Resolution (POST /api/whois/resolve-orgs)
 func handleWhoisResolveOrgs(c fiber.Ctx) error {
 	var body struct {
-		Prefixes  []string      `json:"prefixes"`
-		Asns      []interface{} `json:"asns"`
-		Turnstile string        `json:"cf-turnstile-response"`
+		Prefixes []string      `json:"prefixes"`
+		Asns     []interface{} `json:"asns"`
 	}
 	if err := c.Bind().Body(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
-		})
-	}
-
-	turnstileToken := body.Turnstile
-	if turnstileToken == "" {
-		turnstileToken = ExtractTurnstileToken(c)
-	}
-	if turnstileToken != "" && !ValidateCaptchaFull(turnstileToken, "", ExtractClientIP(c)) {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Captcha validation failed",
 		})
 	}
 
@@ -1273,23 +1236,11 @@ func handleWhoisResolveOrgs(c fiber.Ctx) error {
 // Batch WHOIS Lookup (POST /api/whois/batch)
 func handleWhoisBatch(c fiber.Ctx) error {
 	var body struct {
-		Items     []string `json:"items"`
-		Turnstile string   `json:"cf-turnstile-response"`
-		Token     string   `json:"turnstile"`
+		Items []string `json:"items"`
 	}
 	if err := c.Bind().Body(&body); err != nil || len(body.Items) == 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Request body must contain 'items' array",
-		})
-	}
-
-	turnstileToken := body.Turnstile
-	if turnstileToken == "" {
-		turnstileToken = body.Token
-	}
-	if !ValidateCaptchaFull(turnstileToken, "batch", ExtractClientIP(c)) {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"error": "Captcha validation failed",
 		})
 	}
 

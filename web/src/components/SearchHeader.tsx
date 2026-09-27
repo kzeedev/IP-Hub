@@ -1,13 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Sparkles, ArrowRight, X, History, Trash2 } from 'lucide-react';
 import { SearchHistoryItem } from '../types';
-import { TurnstileWidget, type TurnstileInstance } from './TurnstileWidget';
 import { useLanguage } from '../i18n/LanguageContext';
 
 interface SearchHeaderProps {
   query: string;
   setQuery: (q: string) => void;
-  onSearch: (q: string, token?: string) => void;
+  onSearch: (q: string) => void;
   isLoading: boolean;
   history: SearchHistoryItem[];
   onClearHistory: () => void;
@@ -32,8 +31,6 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
 }) => {
   const { t } = useLanguage();
   const [showHistory, setShowHistory] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState<string>('');
-  const turnstileRef = useRef<TurnstileInstance>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -58,13 +55,7 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
     e.preventDefault();
     if (query.trim()) {
       setShowHistory(false);
-      onSearch(query.trim(), turnstileToken);
-      setTurnstileToken('');
-      try {
-        turnstileRef.current?.reset();
-      } catch {
-        // ignore
-      }
+      onSearch(query.trim());
     }
   };
 
@@ -204,16 +195,6 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
           )}
         </form>
 
-        {/* Cloudflare Turnstile CAPTCHA for Single Lookup */}
-        <div className="mt-3 flex justify-center">
-          <TurnstileWidget
-            ref={turnstileRef}
-            action="lookup"
-            onVerify={token => setTurnstileToken(token)}
-            onExpire={() => setTurnstileToken('')}
-          />
-        </div>
-
         {/* Quick Sample Queries */}
         <div className="mt-3 sm:mt-4 flex items-center flex-wrap gap-1.5 sm:gap-2 text-xs">
           <span className="text-slate-400 flex items-center gap-1 font-medium text-[11px] sm:text-xs">
@@ -226,13 +207,7 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
               type="button"
               onClick={() => {
                 setQuery(sample.query);
-                onSearch(sample.query, turnstileToken);
-                setTurnstileToken('');
-                try {
-                  turnstileRef.current?.reset();
-                } catch {
-                  // ignore
-                }
+                onSearch(sample.query);
               }}
               className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition-all text-[11px] sm:text-xs font-mono group"
             >

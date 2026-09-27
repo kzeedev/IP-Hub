@@ -37,7 +37,6 @@ A self-hosted, open-source network intelligence platform powered by **RIPE NCC**
 | 🧱 **Firewall Rule Generator** | Export IP lists as **MikroTik** address-lists, **Cisco ACL**, **.htaccess**, **iptables**, or **FreeBSD PF** rules |
 | 📦 **Batch Inspector** | Query up to 50 IPs/ASNs at once with CSV/JSON export |
 | 🧮 **Subnet Calculator** | Compute network range, broadcast, subnet mask, wildcard, and binary breakdown |
-| 🛡️ **Turnstile Protection** | Cloudflare Turnstile CAPTCHA on all API endpoints |
 | 🌐 **Multi Language** | Full English and Persian (فارسی) interface with RTL support |
 | ⚡ **Redis Caching** | Smart caching layer for fast repeat queries and reduced upstream load |
 | 🔌 **Plugin System** | Dynamic Go plugin architecture for custom firewall output formats |
@@ -49,7 +48,7 @@ A self-hosted, open-source network intelligence platform powered by **RIPE NCC**
 │                   Browser (SPA)                  │
 │         React 19 · Vite · Tailwind CSS 4         │
 └────────────────────┬─────────────────────────────┘
-                     │  POST JSON + Turnstile Token
+                     │  POST JSON (REST API)
                      ▼
 ┌──────────────────────────────────────────────────┐
 │               Go Fiber v3 Backend                │
@@ -94,9 +93,6 @@ Edit `.env` with your values:
 ```env
 PORT=3000
 REDIS_URL=redis://localhost:6379/1
-TURNSTILE_SECRET=your_cloudflare_turnstile_secret_key
-TURNSTILE_HOSTNAMES=localhost,127.0.0.1
-VITE_TURNSTILE_SITE_KEY=your_cloudflare_turnstile_site_key
 ```
 
 ### 2. Build Frontend
@@ -129,8 +125,6 @@ docker run -d \
   --name ip-hub \
   -p 3000:3000 \
   -e REDIS_URL=redis://host.docker.internal:6379/1 \
-  -e TURNSTILE_SECRET=your_secret \
-  -e TURNSTILE_HOSTNAMES=your-domain.com \
   ghcr.io/kzeedev/ip-hub:latest
 ```
 
@@ -323,10 +317,7 @@ Language can be toggled from the settings modal in the UI.
 | Variable | Required | Description |
 |---|---|---|
 | `REDIS_URL` | ✅ | Redis connection string |
-| `TURNSTILE_SECRET` | ✅ | Cloudflare Turnstile secret key |
-| `TURNSTILE_HOSTNAMES` | ❌ | Comma-separated allowed hostnames for Turnstile |
 | `PORT` | ❌ | Server port (default: `3000`) |
-| `VITE_TURNSTILE_SITE_KEY` | ✅ | Turnstile site key (frontend build-time) |
 
 ## 🤝 Contributing
 

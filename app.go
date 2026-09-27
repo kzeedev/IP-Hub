@@ -35,11 +35,6 @@ func init() {
 		config.RedisURL = redisURL
 	}
 
-	turnstileSecret := strings.TrimSpace(os.Getenv("TURNSTILE_SECRET"))
-	if turnstileSecret == "" {
-		missing = append(missing, "TURNSTILE_SECRET")
-	}
-
 	if len(missing) > 0 {
 		log.Fatalf("Fatal: missing required environment variable(s): %s", strings.Join(missing, ", "))
 	}

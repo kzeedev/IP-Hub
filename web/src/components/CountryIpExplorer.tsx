@@ -27,7 +27,6 @@ import { ALL_COUNTRIES, POPULAR_COUNTRIES, getCountryDetails } from '../utils/co
 import { copyToClipboard, downloadText } from '../utils/helpers';
 import { generateFirewallConfig } from '../utils/formatters';
 import { getRouteUrl } from '../utils/router';
-import { TurnstileWidget, type TurnstileInstance } from './TurnstileWidget';
 import { useLanguage } from '../i18n/LanguageContext';
 
 interface CountryIpExplorerProps {
@@ -43,8 +42,6 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   const [selectedCountry, setSelectedCountry] = useState<string>('');
   const [countrySearchQuery, setCountrySearchQuery] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
-  const [turnstileToken, setTurnstileToken] = useState<string>('');
-  const turnstileRef = useRef<TurnstileInstance>(null);
 
   const [data, setData] = useState<CountryIpResource | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -73,20 +70,16 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   const [isTableCopied, setIsTableCopied] = useState<boolean>(false);
 
   // Fetch country data from backend
-  const fetchCountryData = async (code: string, token?: string) => {
+  const fetchCountryData = async (code: string) => {
     setIsLoading(true);
     setError(null);
     setPage(1);
 
     try {
-      const activeToken = token || turnstileToken;
       const res = await fetch('/api/whois/country', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code,
-          'cf-turnstile-response': activeToken || '',
-        }),
+        body: JSON.stringify({ code }),
       });
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
@@ -110,12 +103,6 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
       setData(null);
     } finally {
       setIsLoading(false);
-      setTurnstileToken('');
-      try {
-        turnstileRef.current?.reset();
-      } catch {
-        // ignore
-      }
     }
   };
 
@@ -393,16 +380,6 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
               </div>
             )}
           </div>
-        </div>
-
-        {/* Cloudflare Turnstile CAPTCHA */}
-        <div className="pt-3 flex justify-center border-t border-slate-800/80">
-          <TurnstileWidget
-            ref={turnstileRef}
-            action="country"
-            onVerify={token => setTurnstileToken(token)}
-            onExpire={() => setTurnstileToken('')}
-          />
         </div>
 
         {/* Popular Country Chips */}

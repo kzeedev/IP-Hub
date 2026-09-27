@@ -106,7 +106,7 @@ export default function App() {
   };
 
   // Lookup action with optional URL history push
-  const performLookup = async (targetQuery: string, updateUrl = true, token?: string) => {
+  const performLookup = async (targetQuery: string, updateUrl = true) => {
     const cleanQuery = targetQuery.trim();
     if (!cleanQuery) return;
 
@@ -125,7 +125,6 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: cleanQuery,
-          'cf-turnstile-response': token || '',
         }),
       });
       if (!res.ok) {
@@ -327,7 +326,7 @@ export default function App() {
           <SearchHeader
             query={query}
             setQuery={setQuery}
-            onSearch={(q, token) => performLookup(q, true, token)}
+            onSearch={(q) => performLookup(q, true)}
             isLoading={isLoading}
             history={searchHistory}
             onClearHistory={handleClearHistory}
