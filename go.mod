@@ -3,14 +3,18 @@ module github.com/kzeedev/IP-Hub
 go 1.25.0
 
 require (
+	github.com/danielgtaylor/huma/v2 v2.39.1
 	github.com/joho/godotenv v1.5.1
 	github.com/mikekonan/go-countries v1.1.2
 	github.com/redis/go-redis/v9 v9.8.0
 )
 
 require (
+	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
+	github.com/gofiber/fiber/v2 v2.52.14 // indirect
 	github.com/gofiber/schema v1.8.3 // indirect
 	github.com/gofiber/utils/v2 v2.4.1 // indirect
+	github.com/mattn/go-runewidth v0.0.24 // indirect
 	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/text v0.40.0 // indirect

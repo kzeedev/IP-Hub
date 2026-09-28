@@ -111,8 +111,8 @@ func markdownNegotiationMiddleware(c fiber.Ctx) error {
 	}
 
 	rawPath := c.Path()
-	// Skip API routes and known static assets
-	if strings.HasPrefix(rawPath, "/api/") || isStaticAsset(rawPath) {
+	// Skip API routes, OpenAPI spec, docs, and known static assets
+	if strings.HasPrefix(rawPath, "/api/") || strings.HasPrefix(rawPath, "/openapi") || strings.HasPrefix(rawPath, "/docs") || strings.HasPrefix(rawPath, "/schemas") || strings.HasPrefix(rawPath, "/.well-known/") || isStaticAsset(rawPath) {
 		return c.Next()
 	}
 
@@ -381,11 +381,8 @@ Please check that the ASN format is valid (e.g. `+"`AS13335`"+` or `+"`13335`"+`
 
 		var prefixList strings.Builder
 		count := len(record.Prefixes)
-		displayLimit := 25
-		if count < displayLimit {
-			displayLimit = count
-		}
-		for i := 0; i < displayLimit; i++ {
+		displayLimit := min(count, 25)
+		for i := range displayLimit {
 			fmt.Fprintf(&prefixList, "- `%s`\n", record.Prefixes[i])
 		}
 		if count > displayLimit {
@@ -570,8 +567,8 @@ Use this tool to inspect any IPv4 address, IPv6 address, CIDR prefix, or Autonom
 // 4. Country IP Delegations Markdown
 func renderCountryMarkdown(rawCode, lang string) string {
 	code := strings.ToUpper(strings.TrimSpace(rawCode))
-	if strings.HasSuffix(code, ".MD") {
-		code = strings.TrimSuffix(code, ".MD")
+	if before, ok := strings.CutSuffix(code, ".MD"); ok {
+		code = before
 	}
 
 	res, err := executeCountryLookup(code)
@@ -590,11 +587,8 @@ Please use a valid ISO 3166-1 alpha-2 code (e.g. `+"`/country/IR`"+`, `+"`/count
 	}
 
 	var ipv4Sample strings.Builder
-	v4Display := 20
-	if len(res.IPv4) < v4Display {
-		v4Display = len(res.IPv4)
-	}
-	for i := 0; i < v4Display; i++ {
+	v4Display := min(len(res.IPv4), 20)
+	for i := range v4Display {
 		fmt.Fprintf(&ipv4Sample, "- `%s`\n", res.IPv4[i])
 	}
 	if len(res.IPv4) > v4Display {
@@ -602,11 +596,8 @@ Please use a valid ISO 3166-1 alpha-2 code (e.g. `+"`/country/IR`"+`, `+"`/count
 	}
 
 	var ipv6Sample strings.Builder
-	v6Display := 20
-	if len(res.IPv6) < v6Display {
-		v6Display = len(res.IPv6)
-	}
-	for i := 0; i < v6Display; i++ {
+	v6Display := min(len(res.IPv6), 20)
+	for i := range v6Display {
 		fmt.Fprintf(&ipv6Sample, "- `%s`\n", res.IPv6[i])
 	}
 	if len(res.IPv6) > v6Display {

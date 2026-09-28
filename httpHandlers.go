@@ -864,22 +864,15 @@ func handleWhoisLookup(c fiber.Ctx) error {
 	})
 }
 
-// Client IP Lookup (GET /api/whois/myip)
-func handleWhoisMyIp(c fiber.Ctx) error {
-	clientIP := c.Get("X-Forwarded-For")
-	if clientIP == "" {
-		clientIP = c.Get("X-Real-IP")
-	}
-	if clientIP == "" {
-		clientIP = c.IP()
-	}
+// resolveClientIP sanitizes and falls back to public echo if running in local environment
+func resolveClientIP(clientIP string) string {
 	if strings.Contains(clientIP, ",") {
 		clientIP = strings.TrimSpace(strings.Split(clientIP, ",")[0])
 	}
 	clientIP = strings.TrimPrefix(clientIP, "::ffff:")
 
-	// If local, try public echo or default to RIPE
-	if clientIP == "" || clientIP == "127.0.0.1" || clientIP == "::1" || strings.HasPrefix(clientIP, "10.") || strings.HasPrefix(clientIP, "192.168.") {
+	// If local or loopback, try public echo or default to RIPE
+	if clientIP == "" || clientIP == "127.0.0.1" || clientIP == "::1" || clientIP == "0.0.0.0" || strings.HasPrefix(clientIP, "10.") || strings.HasPrefix(clientIP, "192.168.") {
 		var echoRes struct {
 			IP string `json:"ip"`
 		}
@@ -889,6 +882,19 @@ func handleWhoisMyIp(c fiber.Ctx) error {
 			clientIP = "193.0.6.139"
 		}
 	}
+	return clientIP
+}
+
+// Client IP Lookup (GET /api/whois/myip)
+func handleWhoisMyIp(c fiber.Ctx) error {
+	clientIP := c.Get("X-Forwarded-For")
+	if clientIP == "" {
+		clientIP = c.Get("X-Real-IP")
+	}
+	if clientIP == "" {
+		clientIP = c.IP()
+	}
+	clientIP = resolveClientIP(clientIP)
 
 	record, err := executeIpLookup(clientIP)
 	if err != nil {
@@ -1153,18 +1159,8 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 	wg.Wait()
 }
 
-// Bulk Org Resolution (POST /api/whois/resolve-orgs)
-func handleWhoisResolveOrgs(c fiber.Ctx) error {
-	var body struct {
-		Prefixes []string      `json:"prefixes"`
-		Asns     []interface{} `json:"asns"`
-	}
-	if err := c.Bind().Body(&body); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
-	}
-
+// executeResolveOrgs resolves ASN and prefix organization names
+func executeResolveOrgs(asns []interface{}, prefixes []string) map[string]string {
 	dailyTtl := getEndOfDayTtl()
 	orgs := make(map[string]string)
 	var mu sync.Mutex
@@ -1172,7 +1168,7 @@ func handleWhoisResolveOrgs(c fiber.Ctx) error {
 
 	// Resolve AS names
 	var missingAsns []string
-	for _, a := range body.Asns {
+	for _, a := range asns {
 		var s string
 		switch v := a.(type) {
 		case float64:
@@ -1216,7 +1212,7 @@ func handleWhoisResolveOrgs(c fiber.Ctx) error {
 
 	// Resolve Prefixes
 	var missingPrefixes []string
-	for _, p := range body.Prefixes {
+	for _, p := range prefixes {
 		var org string
 		if found, _ := database.GetJSON("prefix_org_"+p, &org); found && org != "" {
 			orgs[p] = org
@@ -1247,21 +1243,27 @@ func handleWhoisResolveOrgs(c fiber.Ctx) error {
 	}
 
 	wg.Wait()
-	return c.JSON(fiber.Map{"orgs": orgs})
+	return orgs
 }
 
-// Batch WHOIS Lookup (POST /api/whois/batch)
-func handleWhoisBatch(c fiber.Ctx) error {
+// Bulk Org Resolution (POST /api/whois/resolve-orgs)
+func handleWhoisResolveOrgs(c fiber.Ctx) error {
 	var body struct {
-		Items []string `json:"items"`
+		Prefixes []string      `json:"prefixes"`
+		Asns     []interface{} `json:"asns"`
 	}
-	if err := c.Bind().Body(&body); err != nil || len(body.Items) == 0 {
+	if err := c.Bind().Body(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Request body must contain 'items' array",
+			"error": "Invalid request body",
 		})
 	}
 
-	items := body.Items
+	orgs := executeResolveOrgs(body.Asns, body.Prefixes)
+	return c.JSON(fiber.Map{"orgs": orgs})
+}
+
+// executeBatchLookup inspects up to 50 IP addresses in parallel
+func executeBatchLookup(items []string) []models.BatchItemResult {
 	if len(items) > 50 {
 		items = items[:50]
 	}
@@ -1297,6 +1299,21 @@ func handleWhoisBatch(c fiber.Ctx) error {
 	}
 
 	wg.Wait()
+	return results
+}
+
+// Batch WHOIS Lookup (POST /api/whois/batch)
+func handleWhoisBatch(c fiber.Ctx) error {
+	var body struct {
+		Items []string `json:"items"`
+	}
+	if err := c.Bind().Body(&body); err != nil || len(body.Items) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Request body must contain 'items' array",
+		})
+	}
+
+	results := executeBatchLookup(body.Items)
 	return c.JSON(fiber.Map{
 		"count": len(results),
 		"items": results,

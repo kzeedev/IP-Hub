@@ -40,6 +40,7 @@ A self-hosted, open-source network intelligence platform powered by **RIPE NCC**
 | 🌐 **Multi Language** | Full English and Persian (فارسی) interface with RTL support |
 | ⚡ **Redis Caching** | Smart caching layer for fast repeat queries and reduced upstream load |
 | 🔌 **Plugin System** | Dynamic Go plugin architecture for custom firewall output formats |
+| 📖 **OpenAPI 3.1 & Docs** | Interactive documentation at `/docs` (Stoplight Elements), OpenAPI 3.1 specs (`/openapi.json`, `/openapi.yaml`), and RFC 9727 API catalog (`/.well-known/api-catalog`) |
 
 ## 🏗️ Architecture
 
@@ -111,6 +112,28 @@ go run .
 ```
 
 The server starts at **http://localhost:3000**.
+
+## 📖 API Documentation & OpenAPI
+
+IP-Hub exposes a modern OpenAPI 3.1 specification powered by [GoFiber's OpenAPI Recipe](https://github.com/gofiber/recipes/tree/master/openapi) and [Huma v2](https://github.com/danielgtaylor/huma):
+
+- **Interactive API Documentation (Stoplight Elements)**: [http://localhost:3000/docs](http://localhost:3000/docs)
+- **OpenAPI 3.1 JSON Specification**: [http://localhost:3000/openapi.json](http://localhost:3000/openapi.json)
+- **OpenAPI 3.1 YAML Specification**: [http://localhost:3000/openapi.yaml](http://localhost:3000/openapi.yaml)
+- **RFC 9727 API Catalog**: [http://localhost:3000/.well-known/api-catalog](http://localhost:3000/.well-known/api-catalog)
+
+### Core API Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/whois/myip` | Detect client public IP and inspect WHOIS/BGP records |
+| `POST` | `/api/whois/lookup` | Unified WHOIS lookup for IP, ASN, or CIDR prefix |
+| `POST` | `/api/whois/country` | Retrieve allocated IP prefixes and ASNs for an ISO country code |
+| `POST` | `/api/whois/resolve-orgs` | Bulk resolve organization and ISP holder names |
+| `POST` | `/api/whois/batch` | Concurrently inspect up to 50 IP addresses |
+| `GET` | `/api/whois/subnet` | Calculate subnet breakdown, netmask, wildcard, and usable hosts |
+| `POST` | `/lookup` | Export country IP lists for firewalls (MikroTik, Cisco, .htaccess) |
+| `GET` | `/.well-known/api-catalog` | RFC 9727 machine-readable API discovery catalog |
 
 ## 🐳 Docker
 

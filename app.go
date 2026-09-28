@@ -74,14 +74,8 @@ func init() {
 		Level: compress.LevelBestCompression,
 	}))
 
-	// Native Go WHOIS API Endpoints
-	api := app.Group("/api/whois")
-	api.Get("/myip", handleWhoisMyIp)
-	api.Post("/lookup", handleWhoisLookup)
-	api.Post("/country", handleWhoisCountry)
-	api.Post("/resolve-orgs", handleWhoisResolveOrgs)
-	api.Post("/batch", handleWhoisBatch)
-	api.Get("/subnet", handleWhoisSubnet)
+	// Setup OpenAPI 3.1 & Interactive Docs via Huma v2 (GoFiber OpenAPI Recipe)
+	setupOpenAPI(app)
 
 	// Legacy IP-Hub plugin endpoint
 	app.Post("/lookup", handleRequest)
@@ -96,7 +90,7 @@ func init() {
 
 	// SPA fallback: Route all non-API GET requests to index.html
 	app.Get("*", func(c fiber.Ctx) error {
-		if strings.HasPrefix(c.Path(), "/api") {
+		if strings.HasPrefix(c.Path(), "/api") || strings.HasPrefix(c.Path(), "/openapi") || strings.HasPrefix(c.Path(), "/docs") || strings.HasPrefix(c.Path(), "/schemas") || strings.HasPrefix(c.Path(), "/.well-known") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Endpoint not found"})
 		}
 		c.Set("Vary", "Accept")
