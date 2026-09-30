@@ -100,7 +100,7 @@ func init() {
 	}))
 
 	// Rate limiting
-	app.Use("/lookup", limiter.New(limiter.Config{
+	app.Use("/api/whois/lookup", limiter.New(limiter.Config{
 		Max:        100,
 		Expiration: 1 * time.Minute,
 	}))
@@ -129,9 +129,6 @@ func init() {
 
 	// Setup OpenAPI 3.1 & Interactive Docs via Huma v2 (GoFiber OpenAPI Recipe)
 	setupOpenAPI(app)
-
-	// Legacy IP-Hub plugin endpoint
-	app.Post("/lookup", handleRequest)
 
 	// Markdown for Agents content negotiation (RFC 7231 / Cloudflare standard)
 	app.Use(markdownNegotiationMiddleware)

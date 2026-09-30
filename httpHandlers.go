@@ -13,10 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gofiber/fiber/v3"
 	"github.com/kzeedev/IP-Hub/database"
 	"github.com/kzeedev/IP-Hub/models"
-	"github.com/kzeedev/IP-Hub/pluginBase"
 	country "github.com/mikekonan/go-countries"
 )
 
@@ -715,9 +713,7 @@ func executeAsnLookup(rawQuery string) (*models.AsnRecord, error) {
 	)
 
 	// AS Overview
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		var res struct {
 			Data struct {
 				Holder    string `json:"holder"`
@@ -731,12 +727,10 @@ func executeAsnLookup(rawQuery string) (*models.AsnRecord, error) {
 			}
 			announced = res.Data.Announced
 		}
-	}()
+	})
 
 	// Announced Prefixes
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		var res struct {
 			Data struct {
 				Prefixes []struct {
@@ -752,7 +746,7 @@ func executeAsnLookup(rawQuery string) (*models.AsnRecord, error) {
 				}
 			}
 		}
-	}()
+	})
 
 	wg.Wait()
 
@@ -778,112 +772,6 @@ func executeAsnLookup(rawQuery string) (*models.AsnRecord, error) {
 // Fiber Handlers
 // -----------------------------------------------------------------------------
 
-type FormRequest struct {
-	Country string `json:"country"`
-	IPType  string `json:"version"`
-	Format  string `json:"format"`
-	Access  string `json:"access"`
-}
-
-// Legacy IP-Hub plugin endpoint (POST /lookup)
-func handleRequest(c fiber.Ctx) error {
-	request := new(FormRequest)
-
-	if err := c.Bind().Body(request); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-
-	cleanCountry := strings.ToUpper(strings.TrimSpace(request.Country))
-	if len(cleanCountry) != 2 || cleanCountry[0] < 'A' || cleanCountry[0] > 'Z' || cleanCountry[1] < 'A' || cleanCountry[1] > 'Z' {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid country code: must be a 2-letter ISO 3166-1 alpha-2 code",
-		})
-	}
-	request.Country = cleanCountry
-
-	info, err := database.DB.GetOrSet(request.Country, func() (*pluginBase.Lookup, error) {
-		result := lookup(request.Country)
-		return &result, nil
-	})
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-
-	switch request.Format {
-	case "json":
-		return c.JSON(info)
-	case "htaccess":
-		access := "Deny"
-		if request.Access == "allow" {
-			access = "Allow"
-		}
-		switch request.IPType {
-		case "ipv4":
-			return c.SendString(fmt.Sprintf("%s from %v", access, arrayToString(info.IPv4)))
-		case "ipv6":
-			return c.SendString(fmt.Sprintf("%s from %v", access, arrayToString(info.IPv6)))
-		default:
-			return c.SendString(fmt.Sprintf("%s from %v\n%s from %v", access, arrayToString(info.IPv4), access, arrayToString(info.IPv6)))
-		}
-	default:
-		for _, plugin := range plugins {
-			if plugin.GetID() == request.Format {
-				result := plugin.Format(*info, pluginBase.IPVersion(request.IPType), request.Access == "allow")
-				return c.SendString(result)
-			}
-		}
-		fmt.Println(`Can't find plugin with id: `, request.Format)
-	}
-	return c.JSON(info)
-}
-
-// WHOIS Single Lookup (POST /api/whois/lookup)
-func handleWhoisLookup(c fiber.Ctx) error {
-	var body struct {
-		Query string `json:"query"`
-	}
-	if err := c.Bind().Body(&body); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
-	}
-
-	resource := strings.TrimSpace(body.Query)
-	if resource == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Missing IP, ASN, or prefix parameter",
-		})
-	}
-
-	if isAsnQuery(resource) {
-		record, err := executeAsnLookup(resource)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
-			})
-		}
-		return c.JSON(fiber.Map{
-			"type": "asn",
-			"data": record,
-		})
-	}
-
-	record, err := executeIpLookup(resource)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-	return c.JSON(fiber.Map{
-		"type": "ip",
-		"data": record,
-	})
-}
-
 // resolveClientIP sanitizes, validates IP format, and falls back to public echo if running in local environment
 func resolveClientIP(clientIP string) string {
 	if strings.Contains(clientIP, ",") {
@@ -904,58 +792,6 @@ func resolveClientIP(clientIP string) string {
 		}
 	}
 	return clientIP
-}
-
-// Client IP Lookup (GET /api/whois/myip)
-func handleWhoisMyIp(c fiber.Ctx) error {
-	clientIP := c.Get("X-Forwarded-For")
-	if clientIP == "" {
-		clientIP = c.Get("X-Real-IP")
-	}
-	if clientIP == "" {
-		clientIP = c.IP()
-	}
-	clientIP = resolveClientIP(clientIP)
-
-	record, err := executeIpLookup(clientIP)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-	return c.JSON(fiber.Map{
-		"clientIp": clientIP,
-		"type":     "ip",
-		"data":     record,
-	})
-}
-
-// Country Resource Explorer (POST /api/whois/country)
-func handleWhoisCountry(c fiber.Ctx) error {
-	var body struct {
-		Code string `json:"code"`
-	}
-	if err := c.Bind().Body(&body); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
-	}
-
-	code := strings.ToUpper(strings.TrimSpace(body.Code))
-	if len(code) != 2 || code[0] < 'A' || code[0] > 'Z' || code[1] < 'A' || code[1] > 'Z' {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Country code must be a 2-letter ISO 3166-1 alpha-2 code",
-		})
-	}
-
-	res, err := executeCountryLookup(code)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-
-	return c.JSON(fiber.Map{"data": res})
 }
 
 // Core Country Lookup logic
@@ -1218,9 +1054,7 @@ func executeResolveOrgs(asns []interface{}, prefixes []string) map[string]string
 	}
 
 	if len(missingAsns) > 0 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			var asRes struct {
 				Data struct {
 					Names map[string]string `json:"names"`
@@ -1237,7 +1071,7 @@ func executeResolveOrgs(asns []interface{}, prefixes []string) map[string]string
 				}
 				mu.Unlock()
 			}
-		}()
+		})
 	}
 
 	// Resolve Prefixes with bounded concurrency
@@ -1254,9 +1088,7 @@ func executeResolveOrgs(asns []interface{}, prefixes []string) map[string]string
 	sem := make(chan struct{}, 6)
 	for _, p := range missingPrefixes {
 		prefix := p
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
@@ -1275,34 +1107,11 @@ func executeResolveOrgs(asns []interface{}, prefixes []string) map[string]string
 				mu.Unlock()
 				_ = database.SetJSON("prefix_org_"+prefix, holder, dailyTtl)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
 	return orgs
-}
-
-// Bulk Org Resolution (POST /api/whois/resolve-orgs)
-func handleWhoisResolveOrgs(c fiber.Ctx) error {
-	var body struct {
-		Prefixes []string      `json:"prefixes"`
-		Asns     []interface{} `json:"asns"`
-	}
-	if err := c.Bind().Body(&body); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
-	}
-
-	// Enforce maximum item limit
-	if len(body.Prefixes) > 50 || len(body.Asns) > 50 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Exceeded maximum allowed items: limit is 50 prefixes and 50 ASNs per request",
-		})
-	}
-
-	orgs := executeResolveOrgs(body.Asns, body.Prefixes)
-	return c.JSON(fiber.Map{"orgs": orgs})
 }
 
 // executeBatchLookup inspects up to 50 IP addresses in parallel
@@ -1343,62 +1152,4 @@ func executeBatchLookup(items []string) []models.BatchItemResult {
 
 	wg.Wait()
 	return results
-}
-
-// Batch WHOIS Lookup (POST /api/whois/batch)
-func handleWhoisBatch(c fiber.Ctx) error {
-	var body struct {
-		Items []string `json:"items"`
-	}
-	if err := c.Bind().Body(&body); err != nil || len(body.Items) == 0 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Request body must contain non-empty 'items' array",
-		})
-	}
-
-	// Reject batches larger than 50 items
-	if len(body.Items) > 50 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Batch size exceeds maximum limit of 50 items",
-		})
-	}
-
-	results := executeBatchLookup(body.Items)
-	return c.JSON(fiber.Map{
-		"count": len(results),
-		"items": results,
-	})
-}
-
-// CIDR / Subnet Breakdown (GET /api/whois/subnet)
-func handleWhoisSubnet(c fiber.Ctx) error {
-	ip := strings.TrimSpace(c.Query("ip"))
-	cidrStr := strings.TrimSpace(c.Query("cidr"))
-	if ip == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Query parameter 'ip' is required",
-		})
-	}
-	if len(ip) > 64 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Query parameter 'ip' exceeds maximum length",
-		})
-	}
-
-	var cidrPtr *int
-	if cidrStr != "" {
-		if cVal, err := strconv.Atoi(cidrStr); err == nil {
-			cidrPtr = &cVal
-		}
-	}
-
-	res := computeSubnet(ip, cidrPtr)
-	if res == nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid IP or CIDR format",
-		})
-	}
-	return c.JSON(fiber.Map{
-		"data": res,
-	})
 }

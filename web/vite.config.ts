@@ -18,10 +18,6 @@ export default defineConfig(() => {
           target: 'http://localhost:3000',
           changeOrigin: true,
         },
-        '/lookup': {
-          target: 'http://localhost:3000',
-          changeOrigin: true,
-        },
       },
     },
     build: {

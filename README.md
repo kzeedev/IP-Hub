@@ -132,7 +132,6 @@ IP-Hub exposes a modern OpenAPI 3.1 specification powered by [GoFiber's OpenAPI 
 | `POST` | `/api/whois/resolve-orgs` | Bulk resolve organization and ISP holder names |
 | `POST` | `/api/whois/batch` | Concurrently inspect up to 50 IP addresses |
 | `GET` | `/api/whois/subnet` | Calculate subnet breakdown, netmask, wildcard, and usable hosts |
-| `POST` | `/lookup` | Export country IP lists for firewalls (MikroTik, Cisco, .htaccess) |
 | `GET` | `/.well-known/api-catalog` | RFC 9727 machine-readable API discovery catalog |
 
 ## 🐳 Docker
