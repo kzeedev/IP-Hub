@@ -17,6 +17,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/kzeedev/IP-Hub/config"
 	"github.com/kzeedev/IP-Hub/database"
+	"github.com/kzeedev/IP-Hub/handler"
 	"github.com/kzeedev/IP-Hub/pluginBase"
 )
 
@@ -24,10 +25,8 @@ var plugins []pluginBase.Plugin
 var app *fiber.App
 
 func init() {
-	// 1. Load local .env file if present
 	_ = godotenv.Load()
 
-	// 2. Validate strictly required environment variables
 	var missing []string
 	redisURL := strings.TrimSpace(os.Getenv("REDIS_URL"))
 	if redisURL == "" {
@@ -40,10 +39,9 @@ func init() {
 		log.Fatalf("Fatal: missing required environment variable(s): %s", strings.Join(missing, ", "))
 	}
 
-	// 3. Load dynamic plugins
 	loadPlugins()
 
-	// 4. Initialize Redis client (strictly required in production)
+	// Initialize Redis client
 	isTest := strings.HasSuffix(os.Args[0], ".test") || strings.HasSuffix(os.Args[0], ".test.exe")
 	if !isTest {
 		for _, arg := range os.Args {
@@ -127,18 +125,18 @@ func init() {
 		Level: compress.LevelBestCompression,
 	}))
 
-	// Setup OpenAPI 3.1 & Interactive Docs via Huma v2 (GoFiber OpenAPI Recipe)
-	setupOpenAPI(app)
+	h := handler.New(handler.NewWhoisService())
+	h.SetupOpenAPI(app)
 
-	// Markdown for Agents content negotiation (RFC 7231 / Cloudflare standard)
-	app.Use(markdownNegotiationMiddleware)
+	// Markdown for Agents content negotiation
+	app.Use(h.MarkdownNegotiationMiddleware())
 
-	// Serve Frontend Single Page Application (web/dist/ and web/public/)
+	// Static assets
 	app.Use("/", static.New("./web/dist"))
 	app.Use("/", static.New("./dist"))
 	app.Use("/public", static.New("./web/public"))
 
-	// SPA fallback: Route all non-API GET requests to index.html
+	// Route non-API GET requests to SPA index.html
 	app.Get("*", func(c fiber.Ctx) error {
 		if strings.HasPrefix(c.Path(), "/api") || strings.HasPrefix(c.Path(), "/openapi") || strings.HasPrefix(c.Path(), "/docs") || strings.HasPrefix(c.Path(), "/schemas") || strings.HasPrefix(c.Path(), "/.well-known") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Endpoint not found"})

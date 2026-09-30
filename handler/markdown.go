@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"fmt"
@@ -10,10 +10,10 @@ import (
 	"github.com/kzeedev/IP-Hub/config"
 )
 
-// Content-Signal header value complying with modern AI crawler and agent standards
+// ContentSignalHeaderValue signals indexing and training permissions for AI agents.
 const ContentSignalHeaderValue = "ai-train=yes, search=yes, ai-input=yes"
 
-// Estimate token count for Markdown content (~4 characters per token heuristic)
+// estimateTokens estimates token count from character length.
 func estimateTokens(s string) int {
 	count := len(s) / 4
 	if count < 1 && len(s) > 0 {
@@ -22,7 +22,7 @@ func estimateTokens(s string) int {
 	return count
 }
 
-// Check if a requested path points to a static file or build asset
+// isStaticAsset reports whether the path targets a static asset file.
 func isStaticAsset(path string) bool {
 	clean := strings.ToLower(path)
 	if strings.HasPrefix(clean, "/assets/") || strings.HasPrefix(clean, "/img/") || strings.HasPrefix(clean, "/public/") {
@@ -41,7 +41,7 @@ func isStaticAsset(path string) bool {
 	return false
 }
 
-// Parse Accept header to extract q-factor for a specific media type
+// getAcceptQ extracts the q-factor for a media type from an Accept header.
 func getAcceptQ(header, mediaType string) float64 {
 	parts := strings.Split(header, ",")
 	for _, part := range parts {
@@ -66,19 +66,16 @@ func getAcceptQ(header, mediaType string) float64 {
 	return 0.0
 }
 
-// wantsMarkdown inspects query parameters, file extensions, and Accept header for Markdown preference
-func wantsMarkdown(c fiber.Ctx) bool {
-	// 1. Explicit query parameter override (e.g. ?format=markdown or ?format=md or ?markdown=1)
+// wantsMarkdown reports whether the request prefers Markdown.
+func (h *Handler) wantsMarkdown(c fiber.Ctx) bool {
 	if strings.EqualFold(c.Query("format"), "markdown") || strings.EqualFold(c.Query("format"), "md") || c.Query("markdown") == "1" {
 		return true
 	}
 
-	// 2. URL path extension (e.g. /country/IR.md, /subnet-calc.md)
 	if strings.HasSuffix(strings.ToLower(c.Path()), ".md") {
 		return true
 	}
 
-	// 3. HTTP Accept header content negotiation
 	accept := c.Get("Accept")
 	if accept == "" {
 		return false
@@ -94,7 +91,6 @@ func wantsMarkdown(c fiber.Ctx) bool {
 		return false
 	}
 
-	// If text/html is not mentioned, text/markdown wins
 	if !strings.Contains(lower, "text/html") {
 		return true
 	}
@@ -103,59 +99,53 @@ func wantsMarkdown(c fiber.Ctx) bool {
 	return mdQ >= htmlQ
 }
 
-// markdownNegotiationMiddleware handles content negotiation for agents requesting text/markdown
-func markdownNegotiationMiddleware(c fiber.Ctx) error {
-	method := c.Method()
-	if method != fiber.MethodGet && method != fiber.MethodHead {
-		return c.Next()
-	}
+// MarkdownNegotiationMiddleware handles content negotiation for text/markdown.
+func (h *Handler) MarkdownNegotiationMiddleware() fiber.Handler {
+	return func(c fiber.Ctx) error {
+		method := c.Method()
+		if method != fiber.MethodGet && method != fiber.MethodHead {
+			return c.Next()
+		}
 
-	rawPath := c.Path()
-	// Skip API routes, OpenAPI spec, docs, and known static assets
-	if strings.HasPrefix(rawPath, "/api/") || strings.HasPrefix(rawPath, "/openapi") || strings.HasPrefix(rawPath, "/docs") || strings.HasPrefix(rawPath, "/schemas") || strings.HasPrefix(rawPath, "/.well-known/") || isStaticAsset(rawPath) {
-		return c.Next()
-	}
+		rawPath := c.Path()
+		if strings.HasPrefix(rawPath, "/api/") || strings.HasPrefix(rawPath, "/openapi") || strings.HasPrefix(rawPath, "/docs") || strings.HasPrefix(rawPath, "/schemas") || strings.HasPrefix(rawPath, "/.well-known/") || isStaticAsset(rawPath) {
+			return c.Next()
+		}
 
-	// Don't intercept specific well-known text files like robots.txt or llms.txt
-	if rawPath == "/robots.txt" || rawPath == "/llms.txt" || rawPath == "/sitemap.xml" {
-		return c.Next()
-	}
+		if rawPath == "/robots.txt" || rawPath == "/llms.txt" || rawPath == "/sitemap.xml" {
+			return c.Next()
+		}
 
-	// Check if the client requested Markdown
-	if !wantsMarkdown(c) {
-		// Ensure Vary: Accept is set on standard HTML responses for correct CDN & proxy caching
+		if !h.wantsMarkdown(c) {
+			c.Set("Vary", "Accept")
+			return c.Next()
+		}
+
+		mdContent := h.generateMarkdownForRoute(c)
+
+		c.Set("Content-Type", "text/markdown; charset=utf-8")
 		c.Set("Vary", "Accept")
-		return c.Next()
+		c.Set("x-markdown-tokens", strconv.Itoa(estimateTokens(mdContent)))
+		c.Set("Content-Signal", ContentSignalHeaderValue)
+
+		if method == fiber.MethodHead {
+			c.Set("Content-Length", strconv.Itoa(len(mdContent)))
+			return c.SendStatus(fiber.StatusOK)
+		}
+
+		return c.SendString(mdContent)
 	}
-
-	// Generate clean Markdown representation for the requested route
-	mdContent := generateMarkdownForRoute(c)
-
-	// Set headers as specified by Cloudflare Markdown for Agents standard
-	c.Set("Content-Type", "text/markdown; charset=utf-8")
-	c.Set("Vary", "Accept")
-	c.Set("x-markdown-tokens", strconv.Itoa(estimateTokens(mdContent)))
-	c.Set("Content-Signal", ContentSignalHeaderValue)
-
-	if method == fiber.MethodHead {
-		c.Set("Content-Length", strconv.Itoa(len(mdContent)))
-		return c.SendStatus(fiber.StatusOK)
-	}
-
-	return c.SendString(mdContent)
 }
 
-// generateMarkdownForRoute parses the URL and renders appropriate Markdown content
-func generateMarkdownForRoute(c fiber.Ctx) string {
+func (h *Handler) generateMarkdownForRoute(c fiber.Ctx) string {
 	rawPath := strings.TrimSpace(c.Path())
-	// Strip .md extension if present
 	if strings.HasSuffix(strings.ToLower(rawPath), ".md") {
 		rawPath = rawPath[:len(rawPath)-3]
 	}
 	cleanPath := strings.Trim(rawPath, "/")
 
 	lang := "en"
-	segments := []string{}
+	var segments []string
 	if cleanPath != "" {
 		for _, s := range strings.Split(cleanPath, "/") {
 			if s != "" {
@@ -164,7 +154,6 @@ func generateMarkdownForRoute(c fiber.Ctx) string {
 		}
 	}
 
-	// Check language prefix
 	if len(segments) > 0 && strings.EqualFold(segments[0], "fa") {
 		lang = "fa"
 		segments = segments[1:]
@@ -174,7 +163,7 @@ func generateMarkdownForRoute(c fiber.Ctx) string {
 	}
 
 	if len(segments) == 0 {
-		return renderHomeMarkdown(lang)
+		return h.renderHomeMarkdown(lang)
 	}
 
 	first := strings.ToLower(segments[0])
@@ -186,12 +175,12 @@ func generateMarkdownForRoute(c fiber.Ctx) string {
 	switch first {
 	case "country", "countries", "country-ips":
 		if rest != "" {
-			return renderCountryMarkdown(rest, lang)
+			return h.renderCountryMarkdown(rest, lang)
 		}
-		return renderCountryListMarkdown(lang)
+		return h.renderCountryListMarkdown(lang)
 
 	case "batch", "batch-inspector":
-		return renderBatchMarkdown(lang)
+		return h.renderBatchMarkdown(lang)
 
 	case "subnet-calc", "subnet", "calculator":
 		query := rest
@@ -204,15 +193,15 @@ func generateMarkdownForRoute(c fiber.Ctx) string {
 			}
 		}
 		if query != "" {
-			return renderSubnetCalcWithQueryMarkdown(query, lang)
+			return h.renderSubnetCalcWithQueryMarkdown(query, lang)
 		}
-		return renderSubnetCalcGuideMarkdown(lang)
+		return h.renderSubnetCalcGuideMarkdown(lang)
 
 	case "source", "about":
-		return renderSourceMarkdown(lang)
+		return h.renderSourceMarkdown(lang)
 
 	case "issues", "bugs":
-		return renderIssuesMarkdown(lang)
+		return h.renderIssuesMarkdown(lang)
 
 	case "lookup", "ip", "asn", "prefix":
 		query := rest
@@ -220,21 +209,19 @@ func generateMarkdownForRoute(c fiber.Ctx) string {
 			query = c.Query("q")
 		}
 		if query != "" {
-			return renderLookupMarkdown(query, lang)
+			return h.renderLookupMarkdown(query, lang)
 		}
-		return renderLookupGuideMarkdown(lang)
+		return h.renderLookupGuideMarkdown(lang)
 
 	default:
-		// Check if first segment is directly an IP or ASN (e.g. /1.1.1.1 or /AS13335)
-		if isAsnQuery(first) || strings.Contains(first, ".") || strings.Contains(first, ":") {
-			return renderLookupMarkdown(first, lang)
+		if h.svc.IsAsnQuery(first) || strings.Contains(first, ".") || strings.Contains(first, ":") {
+			return h.renderLookupMarkdown(first, lang)
 		}
-		return renderHomeMarkdown(lang)
+		return h.renderHomeMarkdown(lang)
 	}
 }
 
-// 1. Home / Platform Overview Markdown
-func renderHomeMarkdown(lang string) string {
+func (h *Handler) renderHomeMarkdown(lang string) string {
 	if lang == "fa" {
 		return `---
 title: آی‌پی هاب - سامانه هوش شبکه، رصد BGP و دایرکتوری رنج IP کشورها
@@ -342,19 +329,18 @@ IP-Hub fully adheres to the Cloudflare **Markdown for Agents** standard. Sending
 }` + "\n```"
 }
 
-// 2. Single Lookup Markdown (IP, CIDR, or ASN)
-func renderLookupMarkdown(rawQuery, lang string) string {
+func (h *Handler) renderLookupMarkdown(rawQuery, lang string) string {
 	query := strings.TrimSpace(rawQuery)
 	if decoded, err := url.PathUnescape(query); err == nil && decoded != "" {
 		query = decoded
 	}
 
 	if query == "" {
-		return renderLookupGuideMarkdown(lang)
+		return h.renderLookupGuideMarkdown(lang)
 	}
 
-	if isAsnQuery(query) {
-		record, err := executeAsnLookup(query)
+	if h.svc.IsAsnQuery(query) {
+		record, err := h.svc.LookupASN(query)
 		if err != nil || record == nil {
 			return fmt.Sprintf(`---
 title: ASN Lookup Error - %s - IP-Hub
@@ -432,8 +418,7 @@ description: BGP announcement state, announced prefix count, registered organiza
 		)
 	}
 
-	// IP Lookup
-	record, err := executeIpLookup(query)
+	record, err := h.svc.LookupIP(query)
 	if err != nil || record == nil {
 		return fmt.Sprintf(`---
 title: IP Lookup Error - %s - IP-Hub
@@ -538,8 +523,7 @@ description: Real-time network intelligence, BGP origin routing, RIPE allocation
 	)
 }
 
-// 3. Lookup Guide Markdown
-func renderLookupGuideMarkdown(lang string) string {
+func (h *Handler) renderLookupGuideMarkdown(lang string) string {
 	return `---
 title: Single WHOIS & ASN Lookup - IP-Hub
 description: Query real-time delegated IP prefixes, BGP origin routing, abuse contacts, and RIPE database objects.
@@ -564,14 +548,13 @@ Use this tool to inspect any IPv4 address, IPv6 address, CIDR prefix, or Autonom
 ` + "```\n"
 }
 
-// 4. Country IP Delegations Markdown
-func renderCountryMarkdown(rawCode, lang string) string {
+func (h *Handler) renderCountryMarkdown(rawCode, lang string) string {
 	code := strings.ToUpper(strings.TrimSpace(rawCode))
 	if before, ok := strings.CutSuffix(code, ".MD"); ok {
 		code = before
 	}
 
-	res, err := executeCountryLookup(code)
+	res, err := h.svc.LookupCountry(code)
 	if err != nil || res == nil {
 		return fmt.Sprintf(`---
 title: Country Not Found - %s - IP-Hub
@@ -604,7 +587,6 @@ Please use a valid ISO 3166-1 alpha-2 code (e.g. `+"`/country/IR`"+`, `+"`/count
 		fmt.Fprintf(&ipv6Sample, "- *... and %d more IPv6 prefixes*\n", len(res.IPv6)-v6Display)
 	}
 
-	// Generate sample firewall scripts
 	mikrotikExample := fmt.Sprintf(`/ip firewall address-list
 add list=COUNTRY_%s address=%s comment="%s delegated range"`,
 		code, getFirstPrefixOrFallback(res.IPv4, "1.0.0.0/24"), res.CountryName)
@@ -694,8 +676,7 @@ func getFirstPrefixOrFallback(list []string, fallback string) string {
 	return fallback
 }
 
-// 5. Country Directory List Markdown
-func renderCountryListMarkdown(lang string) string {
+func (h *Handler) renderCountryListMarkdown(lang string) string {
 	return `---
 title: Country IP Delegations Directory - IP-Hub
 description: Explore and download delegated IPv4 & IPv6 address prefixes by ISO country code, with multi-format firewall generator scripts.
@@ -728,8 +709,7 @@ To query any other country, request ` + "`/country/{ISO_CODE}`" + ` (e.g. ` + "`
 ` + "```\n"
 }
 
-// 6. Batch Inspector Markdown
-func renderBatchMarkdown(lang string) string {
+func (h *Handler) renderBatchMarkdown(lang string) string {
 	return `---
 title: Batch WHOIS Inspector - IP-Hub
 description: Concurrently query and audit up to 50 IP addresses, CIDR blocks, or ASNs with CSV/JSON export.
@@ -760,12 +740,11 @@ The Batch Inspector allows security operations centers (SOC), incident responder
 ` + "```\n"
 }
 
-// 7. Subnet Calculator with Query Markdown
-func renderSubnetCalcWithQueryMarkdown(query, lang string) string {
+func (h *Handler) renderSubnetCalcWithQueryMarkdown(query, lang string) string {
 	trimmed := strings.TrimSpace(query)
-	res := computeSubnet(trimmed, nil)
+	res := h.svc.ComputeSubnet(trimmed, nil)
 	if res == nil {
-		return renderSubnetCalcGuideMarkdown(lang)
+		return h.renderSubnetCalcGuideMarkdown(lang)
 	}
 
 	return fmt.Sprintf(`---
@@ -809,8 +788,7 @@ description: Detailed CIDR calculation breakdown, usable host range, netmask, an
 	)
 }
 
-// 8. Subnet Calculator Guide Markdown
-func renderSubnetCalcGuideMarkdown(lang string) string {
+func (h *Handler) renderSubnetCalcGuideMarkdown(lang string) string {
 	return `---
 title: CIDR Subnet Calculator - IP-Hub
 description: Calculate network bounds, netmask, wildcard mask, broadcast address, and usable host ranges.
@@ -833,8 +811,7 @@ You can calculate any subnet directly via the URL:
 ` + "```\n"
 }
 
-// 9. Source & Architecture Markdown
-func renderSourceMarkdown(lang string) string {
+func (h *Handler) renderSourceMarkdown(lang string) string {
 	return fmt.Sprintf(`---
 title: Source Code & Architecture - IP-Hub
 description: Open-source network intelligence platform architecture, Go Fiber v3 backend, React 19 frontend, Redis caching, and deployment instructions.
@@ -858,8 +835,7 @@ IP-Hub is built with performance and security at its core.
 `, config.Version)
 }
 
-// 10. Issues & Community Support Markdown
-func renderIssuesMarkdown(lang string) string {
+func (h *Handler) renderIssuesMarkdown(lang string) string {
 	return `---
 title: Issue Tracker & Community Support - IP-Hub
 description: Community issue submission, bug reports, feature requests, and vulnerability reporting guidelines for IP-Hub.

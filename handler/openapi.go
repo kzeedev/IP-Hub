@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"context"
@@ -104,8 +104,8 @@ type WhoisSubnetOutput struct {
 	}
 }
 
-// setupOpenAPI initializes Huma v2 with GoFiber according to GoFiber OpenAPI recipes
-func setupOpenAPI(app *fiber.App) huma.API {
+// SetupOpenAPI registers OpenAPI 3.1 endpoints and documentation routes.
+func (h *Handler) SetupOpenAPI(app *fiber.App) huma.API {
 	version := config.Version
 	if version == "" {
 		version = "1.0.0"
@@ -130,7 +130,6 @@ func setupOpenAPI(app *fiber.App) huma.API {
 	humaConfig.OpenAPIPath = "/openapi"
 	humaConfig.SchemasPath = "/schemas"
 
-	// Transformer to ensure error responses provide both RFC 9457 fields and legacy "error" field
 	humaConfig.Transformers = append(humaConfig.Transformers, func(ctx huma.Context, status string, v any) (any, error) {
 		if errModel, ok := v.(*huma.ErrorModel); ok {
 			msg := errModel.Detail
@@ -150,14 +149,12 @@ func setupOpenAPI(app *fiber.App) huma.API {
 
 	api := humafiber.New(app, humaConfig)
 
-	// Context middleware to expose fiber.Ctx to Huma handlers
 	api.UseMiddleware(func(ctx huma.Context, next func(huma.Context)) {
 		fCtx := humafiber.Unwrap(ctx)
 		ctx = huma.WithValue(ctx, fiberContextKey{}, fCtx)
 		next(ctx)
 	})
 
-	// 1. GET /api/whois/myip
 	huma.Register(api, huma.Operation{
 		OperationID: "whois-myip",
 		Method:      http.MethodGet,
@@ -177,9 +174,9 @@ func setupOpenAPI(app *fiber.App) huma.API {
 		if clientIP == "" {
 			clientIP = remoteIP
 		}
-		clientIP = resolveClientIP(clientIP)
+		clientIP = h.svc.ResolveClientIP(clientIP)
 
-		record, err := executeIpLookup(clientIP)
+		record, err := h.svc.LookupIP(clientIP)
 		if err != nil {
 			return nil, huma.Error500InternalServerError(err.Error())
 		}
@@ -191,7 +188,6 @@ func setupOpenAPI(app *fiber.App) huma.API {
 		return resp, nil
 	})
 
-	// 2. POST /api/whois/lookup
 	huma.Register(api, huma.Operation{
 		OperationID: "whois-lookup",
 		Method:      http.MethodPost,
@@ -205,8 +201,8 @@ func setupOpenAPI(app *fiber.App) huma.API {
 			return nil, huma.Error400BadRequest("Missing IP, ASN, or prefix parameter")
 		}
 
-		if isAsnQuery(resource) {
-			record, err := executeAsnLookup(resource)
+		if h.svc.IsAsnQuery(resource) {
+			record, err := h.svc.LookupASN(resource)
 			if err != nil {
 				return nil, huma.Error500InternalServerError(err.Error())
 			}
@@ -216,7 +212,7 @@ func setupOpenAPI(app *fiber.App) huma.API {
 			return resp, nil
 		}
 
-		record, err := executeIpLookup(resource)
+		record, err := h.svc.LookupIP(resource)
 		if err != nil {
 			return nil, huma.Error500InternalServerError(err.Error())
 		}
@@ -226,7 +222,6 @@ func setupOpenAPI(app *fiber.App) huma.API {
 		return resp, nil
 	})
 
-	// 3. POST /api/whois/country
 	huma.Register(api, huma.Operation{
 		OperationID: "whois-country",
 		Method:      http.MethodPost,
@@ -240,7 +235,7 @@ func setupOpenAPI(app *fiber.App) huma.API {
 			return nil, huma.Error400BadRequest("Country code must be a 2-letter ISO 3166-1 alpha-2 code (e.g. US, DE, IR)")
 		}
 
-		res, err := executeCountryLookup(code)
+		res, err := h.svc.LookupCountry(code)
 		if err != nil {
 			return nil, huma.Error500InternalServerError(err.Error())
 		}
@@ -250,7 +245,6 @@ func setupOpenAPI(app *fiber.App) huma.API {
 		return resp, nil
 	})
 
-	// 4. POST /api/whois/resolve-orgs
 	huma.Register(api, huma.Operation{
 		OperationID: "whois-resolve-orgs",
 		Method:      http.MethodPost,
@@ -263,13 +257,12 @@ func setupOpenAPI(app *fiber.App) huma.API {
 			return nil, huma.Error400BadRequest("Exceeded maximum allowed items: limit is 50 prefixes and 50 ASNs per request")
 		}
 
-		orgs := executeResolveOrgs(input.Body.Asns, input.Body.Prefixes)
+		orgs := h.svc.ResolveOrgs(input.Body.Asns, input.Body.Prefixes)
 		resp := &WhoisResolveOrgsOutput{}
 		resp.Body.Orgs = orgs
 		return resp, nil
 	})
 
-	// 5. POST /api/whois/batch
 	huma.Register(api, huma.Operation{
 		OperationID: "whois-batch",
 		Method:      http.MethodPost,
@@ -285,14 +278,13 @@ func setupOpenAPI(app *fiber.App) huma.API {
 			return nil, huma.Error400BadRequest("Batch size exceeds maximum limit of 50 items")
 		}
 
-		results := executeBatchLookup(input.Body.Items)
+		results := h.svc.BatchLookup(input.Body.Items)
 		resp := &WhoisBatchOutput{}
 		resp.Body.Count = len(results)
 		resp.Body.Items = results
 		return resp, nil
 	})
 
-	// 6. GET /api/whois/subnet
 	huma.Register(api, huma.Operation{
 		OperationID: "whois-subnet",
 		Method:      http.MethodGet,
@@ -316,7 +308,7 @@ func setupOpenAPI(app *fiber.App) huma.API {
 			}
 		}
 
-		res := computeSubnet(ip, cidrPtr)
+		res := h.svc.ComputeSubnet(ip, cidrPtr)
 		if res == nil {
 			return nil, huma.Error400BadRequest("Invalid IP or CIDR format")
 		}
@@ -326,7 +318,7 @@ func setupOpenAPI(app *fiber.App) huma.API {
 		return resp, nil
 	})
 
-	// 7. RFC 9727 API Catalog Endpoint (/.well-known/api-catalog)
+	// RFC 9727 API Catalog Endpoint (/.well-known/api-catalog)
 	app.Get("/.well-known/api-catalog", func(c fiber.Ctx) error {
 		baseURL := "https://ip-hub.ir"
 		if host := c.Hostname(); host != "" && !strings.Contains(host, "ip-hub.ir") {

@@ -24,7 +24,7 @@ export function parseRoute(
   let lang: Language = 'en';
   let segments = cleanPath.split('/').filter(Boolean);
 
-  // 1. Check /fa prefix in URL path
+  // Language prefix
   if (segments.length > 0 && segments[0].toLowerCase() === 'fa') {
     lang = 'fa';
     segments = segments.slice(1);
@@ -52,33 +52,27 @@ export function parseRoute(
   const first = segments[0].toLowerCase();
   const rest = segments.slice(1).join('/');
 
-  // 1. Country IPs route: /country/:code or /countries or /country-ips
   if (first === 'country' || first === 'countries' || first === 'country-ips') {
     const countryCode = rest ? rest.toUpperCase() : 'IR';
     return { view: 'country-ips', countryCode, lang };
   }
 
-  // 2. Batch Inspector route: /batch or /batch-inspector
   if (first === 'batch' || first === 'batch-inspector') {
     return { view: 'batch', lang };
   }
 
-  // 3. CIDR Subnet Calculator route: /subnet-calc or /subnet or /calculator
   if (first === 'subnet-calc' || first === 'subnet' || first === 'calculator') {
     return { view: 'subnet-calc', query: rest ? decodeURIComponent(rest) : undefined, lang };
   }
 
-  // 4. Source & About route: /source or /about
   if (first === 'source' || first === 'about') {
     return { view: 'source', lang };
   }
 
-  // 5. Issues & Bugs route: /issues or /bugs
   if (first === 'issues' || first === 'bugs') {
     return { view: 'issues', lang };
   }
 
-  // 6. Single Lookup route: /lookup/:query, /ip/:query, /asn/:query, /prefix/:query
   if (first === 'lookup' || first === 'ip' || first === 'asn' || first === 'prefix') {
     return { view: 'lookup', query: rest ? decodeURIComponent(rest) : undefined, lang };
   }

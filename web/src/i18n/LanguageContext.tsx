@@ -13,7 +13,6 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 function getInitialLanguage(): Language {
-  // 1. Check path for /fa prefix
   try {
     const route = parseRoute();
     if (route.lang === 'fa' || route.lang === 'en') {
@@ -23,7 +22,6 @@ function getInitialLanguage(): Language {
     // ignore
   }
 
-  // 2. Check localStorage
   try {
     const stored = localStorage.getItem('iphub_language') as Language;
     if (stored === 'en' || stored === 'fa') {

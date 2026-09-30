@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"encoding/binary"
@@ -18,12 +18,67 @@ import (
 	country "github.com/mikekonan/go-countries"
 )
 
-// HTTP Client with sane timeouts
-var httpClient = &http.Client{
-	Timeout: 7 * time.Second,
+// IPLookupService defines IP intelligence operations.
+type IPLookupService interface {
+	LookupIP(query string) (*models.WhoisRecord, error)
+	ResolveClientIP(clientIP string) string
 }
 
-// Calculate TTL to expire at the end of the current UTC day (00:01:00 UTC next day)
+// ASNLookupService defines Autonomous System intelligence operations.
+type ASNLookupService interface {
+	LookupASN(query string) (*models.AsnRecord, error)
+	IsAsnQuery(q string) bool
+}
+
+// CountryResourceService defines country IP and ASN delegation operations.
+type CountryResourceService interface {
+	LookupCountry(code string) (*models.CountryIpResource, error)
+	ResolveOrgs(asns []interface{}, prefixes []string) map[string]string
+}
+
+// SubnetCalculatorService defines subnet and CIDR breakdown operations.
+type SubnetCalculatorService interface {
+	ComputeSubnet(input string, customCidr *int) *models.SubnetBreakdown
+}
+
+// BatchLookupService defines multi-target bulk inspection operations.
+type BatchLookupService interface {
+	BatchLookup(items []string) []models.BatchItemResult
+}
+
+// WhoisService aggregates network intelligence domain services.
+type WhoisService interface {
+	IPLookupService
+	ASNLookupService
+	CountryResourceService
+	SubnetCalculatorService
+	BatchLookupService
+}
+
+// whoisService is the concrete implementation of WhoisService.
+type whoisService struct {
+	httpClient         *http.Client
+	countryBgResolving sync.Map
+}
+
+// NewWhoisService creates a new WhoisService with standard timeouts.
+func NewWhoisService() WhoisService {
+	return NewWhoisServiceWithClient(&http.Client{
+		Timeout: 7 * time.Second,
+	})
+}
+
+// NewWhoisServiceWithClient creates a new WhoisService using the provided HTTP client.
+func NewWhoisServiceWithClient(client *http.Client) WhoisService {
+	if client == nil {
+		client = &http.Client{Timeout: 7 * time.Second}
+	}
+	return &whoisService{
+		httpClient: client,
+	}
+}
+
+// getEndOfDayTtl returns the duration until the end of the current UTC day.
 func getEndOfDayTtl() time.Duration {
 	now := time.Now().UTC()
 	endOfDay := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 1, 0, 0, time.UTC)
@@ -34,12 +89,8 @@ func getEndOfDayTtl() time.Duration {
 	return ttl
 }
 
-var (
-	countryBgResolving sync.Map
-)
-
-// Helper: Check if query represents a valid ASN
-func isAsnQuery(q string) bool {
+// IsAsnQuery checks if a query string represents a valid Autonomous System Number.
+func IsAsnQuery(q string) bool {
 	clean := strings.ToUpper(strings.TrimSpace(q))
 	asnStr := clean
 	if strings.HasPrefix(clean, "AS") {
@@ -52,8 +103,12 @@ func isAsnQuery(q string) bool {
 	return err == nil && n > 0 && n <= 4294967295
 }
 
-// Compute Subnet breakdown
-func computeSubnet(input string, customCidr *int) *models.SubnetBreakdown {
+func (s *whoisService) IsAsnQuery(q string) bool {
+	return IsAsnQuery(q)
+}
+
+// ComputeSubnet calculates network bounds, host counts, and addresses for an IPv4/IPv6 input.
+func ComputeSubnet(input string, customCidr *int) *models.SubnetBreakdown {
 	trimmed := strings.TrimSpace(input)
 	var ipStr string
 	var prefix int
@@ -80,7 +135,6 @@ func computeSubnet(input string, customCidr *int) *models.SubnetBreakdown {
 		return nil
 	}
 
-	// Check if IPv4
 	if ip4 := parsedIP.To4(); ip4 != nil {
 		if prefix < 0 || prefix > 32 {
 			prefix = 32
@@ -156,7 +210,6 @@ func computeSubnet(input string, customCidr *int) *models.SubnetBreakdown {
 		}
 	}
 
-	// IPv6
 	if prefix < 0 || prefix > 128 {
 		prefix = 64
 	}
@@ -171,8 +224,11 @@ func computeSubnet(input string, customCidr *int) *models.SubnetBreakdown {
 	}
 }
 
-// Fetch JSON helper
-func fetchJSON(targetURL string, target interface{}) error {
+func (s *whoisService) ComputeSubnet(input string, customCidr *int) *models.SubnetBreakdown {
+	return ComputeSubnet(input, customCidr)
+}
+
+func (s *whoisService) fetchJSON(targetURL string, target interface{}) error {
 	req, err := http.NewRequest("GET", targetURL, nil)
 	if err != nil {
 		return err
@@ -180,7 +236,7 @@ func fetchJSON(targetURL string, target interface{}) error {
 	req.Header.Set("User-Agent", "IP-Hub-Server/2.0")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := httpClient.Do(req)
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -193,10 +249,9 @@ func fetchJSON(targetURL string, target interface{}) error {
 	return json.NewDecoder(resp.Body).Decode(target)
 }
 
-// Core Lookup IP function
-func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
+// LookupIP performs unified WHOIS lookup, GeoLocation resolution, and BGP routing status query.
+func (s *whoisService) LookupIP(rawQuery string) (*models.WhoisRecord, error) {
 	query := strings.TrimSpace(rawQuery)
-	// Validate query length bounds
 	if len(query) == 0 || len(query) > 128 {
 		return nil, fmt.Errorf("invalid query length (must be between 1 and 128 characters)")
 	}
@@ -222,7 +277,6 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 		reverseDns  string
 	)
 
-	// 1. RIPE DB REST API Query
 	wg.Go(func() {
 		var restRes struct {
 			Objects struct {
@@ -245,7 +299,7 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 		}
 
 		u := fmt.Sprintf("https://rest.db.ripe.net/search.json?query-string=%s&flags=no-filtering", url.QueryEscape(query))
-		if err := fetchJSON(u, &restRes); err == nil && len(restRes.Objects.Object) > 0 {
+		if err := s.fetchJSON(u, &restRes); err == nil && len(restRes.Objects.Object) > 0 {
 			var b strings.Builder
 			for _, obj := range restRes.Objects.Object {
 				pk := ""
@@ -269,7 +323,6 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 		}
 	})
 
-	// 2. RIPEstat Geolocation
 	wg.Go(func() {
 		var parseCoord = func(v interface{}) (float64, bool) {
 			if v == nil {
@@ -311,7 +364,7 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 			} `json:"data"`
 		}
 		u := fmt.Sprintf("https://stat.ripe.net/data/geoloc/data.json?resource=%s", url.QueryEscape(query))
-		if err := fetchJSON(u, &geoRes); err == nil && len(geoRes.Data.LocatedResources) > 0 {
+		if err := s.fetchJSON(u, &geoRes); err == nil && len(geoRes.Data.LocatedResources) > 0 {
 			for _, item := range geoRes.Data.LocatedResources {
 				if len(item.Locations) > 0 {
 					loc := item.Locations[0]
@@ -353,7 +406,6 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 			}
 		}
 
-		// Fallback to maxmind-geo-lite if geoloc endpoint had no locations or missing coordinates
 		if geoLoc.Latitude == nil || geoLoc.CountryCode == "" || geoLoc.CountryCode == "XX" {
 			var mmRes struct {
 				Data struct {
@@ -370,7 +422,7 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 				} `json:"data"`
 			}
 			uMax := fmt.Sprintf("https://stat.ripe.net/data/maxmind-geo-lite/data.json?resource=%s", url.QueryEscape(query))
-			if err := fetchJSON(uMax, &mmRes); err == nil && len(mmRes.Data.LocatedResources) > 0 {
+			if err := s.fetchJSON(uMax, &mmRes); err == nil && len(mmRes.Data.LocatedResources) > 0 {
 				for _, item := range mmRes.Data.LocatedResources {
 					if len(item.Locations) > 0 {
 						loc := item.Locations[0]
@@ -401,7 +453,6 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 		}
 	})
 
-	// 3. Routing Status
 	wg.Go(func() {
 		var routRes struct {
 			Data struct {
@@ -424,7 +475,7 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 			} `json:"data"`
 		}
 		u := fmt.Sprintf("https://stat.ripe.net/data/routing-status/data.json?resource=%s", url.QueryEscape(query))
-		if err := fetchJSON(u, &routRes); err == nil {
+		if err := s.fetchJSON(u, &routRes); err == nil {
 			routing.AnnouncedPrefix = routRes.Data.Prefix
 			routing.IsAnnounced = routRes.Data.Announced || len(routRes.Data.Origins) > 0
 			if len(routRes.Data.Origins) > 0 {
@@ -441,7 +492,6 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 		}
 	})
 
-	// 4. Abuse Contact Finder
 	wg.Go(func() {
 		var abuseRes struct {
 			Data struct {
@@ -449,12 +499,11 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 			} `json:"data"`
 		}
 		u := fmt.Sprintf("https://stat.ripe.net/data/abuse-contact-finder/data.json?resource=%s", url.QueryEscape(query))
-		if err := fetchJSON(u, &abuseRes); err == nil && len(abuseRes.Data.AbuseContacts) > 0 {
+		if err := s.fetchJSON(u, &abuseRes); err == nil && len(abuseRes.Data.AbuseContacts) > 0 {
 			abuseEmail = abuseRes.Data.AbuseContacts[0]
 		}
 	})
 
-	// 5. Reverse DNS (validate IP format before lookup)
 	wg.Go(func() {
 		if !strings.Contains(query, "/") && net.ParseIP(query) != nil {
 			names, err := net.LookupAddr(query)
@@ -464,7 +513,6 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 		}
 	})
 
-	// 6. Network Info
 	wg.Go(func() {
 		var netRes struct {
 			Data struct {
@@ -473,7 +521,7 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 			} `json:"data"`
 		}
 		u := fmt.Sprintf("https://stat.ripe.net/data/network-info/data.json?resource=%s", url.QueryEscape(query))
-		if err := fetchJSON(u, &netRes); err == nil {
+		if err := s.fetchJSON(u, &netRes); err == nil {
 			netPrefix = netRes.Data.Prefix
 			for _, a := range netRes.Data.Asns {
 				if n, err := strconv.Atoi(a); err == nil {
@@ -485,7 +533,6 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 
 	wg.Wait()
 
-	// Multi-RIR Fallback if RIPE DB returned nothing
 	if len(objects) == 0 {
 		var statWhois struct {
 			Data struct {
@@ -497,7 +544,7 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 			} `json:"data"`
 		}
 		u := fmt.Sprintf("https://stat.ripe.net/data/whois/data.json?resource=%s", url.QueryEscape(query))
-		if err := fetchJSON(u, &statWhois); err == nil && len(statWhois.Data.Records) > 0 {
+		if err := s.fetchJSON(u, &statWhois); err == nil && len(statWhois.Data.Records) > 0 {
 			if len(statWhois.Data.Authorities) > 0 {
 				source = strings.ToUpper(statWhois.Data.Authorities[0])
 			}
@@ -529,7 +576,6 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 		}
 	}
 
-	// Parse out attributes
 	netname := "Unknown Network"
 	rangeStr := query
 	var descrList []string
@@ -598,6 +644,7 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 			descrList = append(descrList, netname)
 		}
 	}
+
 	if abuseEmail == "" {
 		cleanNet := strings.ToLower(netname)
 		cleanNet = strings.Map(func(r rune) rune {
@@ -612,13 +659,12 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 		abuseEmail = fmt.Sprintf("abuse@%s.net", cleanNet)
 	}
 
-	// Origin AS fallback from net info
 	if routing.OriginAsn == "Unrouted" && len(netAsns) > 0 {
 		routing.OriginAsn = fmt.Sprintf("AS%d", netAsns[0])
 		routing.IsAnnounced = true
 	}
 
-	subnet := computeSubnet(query, nil)
+	subnet := ComputeSubnet(query, nil)
 	cidr := query
 	if netPrefix != "" {
 		cidr = netPrefix
@@ -632,7 +678,6 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 		}
 	}
 
-	// Synchronize GeoLocation country if missing or XX
 	if geoLoc.CountryCode == "" || geoLoc.CountryCode == "XX" {
 		geoLoc.CountryCode = countryCode
 	}
@@ -685,11 +730,10 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 	return record, nil
 }
 
-// Core Lookup ASN function
-func executeAsnLookup(rawQuery string) (*models.AsnRecord, error) {
+// LookupASN performs ASN routing overview, holder details, and announced prefixes query.
+func (s *whoisService) LookupASN(rawQuery string) (*models.AsnRecord, error) {
 	cleanAsn := strings.ToUpper(strings.TrimSpace(rawQuery))
 	asnNumStr := strings.TrimPrefix(cleanAsn, "AS")
-	// Parse unsigned ASN within valid 32-bit ASN range
 	asnUint, err := strconv.ParseUint(asnNumStr, 10, 32)
 	if err != nil || asnUint == 0 || asnUint > 4294967295 {
 		return nil, fmt.Errorf("invalid Autonomous System Number")
@@ -712,7 +756,6 @@ func executeAsnLookup(rawQuery string) (*models.AsnRecord, error) {
 		rawWhois  string
 	)
 
-	// AS Overview
 	wg.Go(func() {
 		var res struct {
 			Data struct {
@@ -721,7 +764,7 @@ func executeAsnLookup(rawQuery string) (*models.AsnRecord, error) {
 			} `json:"data"`
 		}
 		u := fmt.Sprintf("https://stat.ripe.net/data/as-overview/data.json?resource=AS%s", asnNumStr)
-		if err := fetchJSON(u, &res); err == nil {
+		if err := s.fetchJSON(u, &res); err == nil {
 			if res.Data.Holder != "" {
 				holder = res.Data.Holder
 			}
@@ -729,7 +772,6 @@ func executeAsnLookup(rawQuery string) (*models.AsnRecord, error) {
 		}
 	})
 
-	// Announced Prefixes
 	wg.Go(func() {
 		var res struct {
 			Data struct {
@@ -739,7 +781,7 @@ func executeAsnLookup(rawQuery string) (*models.AsnRecord, error) {
 			} `json:"data"`
 		}
 		u := fmt.Sprintf("https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS%s", asnNumStr)
-		if err := fetchJSON(u, &res); err == nil {
+		if err := s.fetchJSON(u, &res); err == nil {
 			for _, p := range res.Data.Prefixes {
 				if p.Prefix != "" {
 					prefixes = append(prefixes, p.Prefix)
@@ -768,24 +810,19 @@ func executeAsnLookup(rawQuery string) (*models.AsnRecord, error) {
 	return record, nil
 }
 
-// -----------------------------------------------------------------------------
-// Fiber Handlers
-// -----------------------------------------------------------------------------
-
-// resolveClientIP sanitizes, validates IP format, and falls back to public echo if running in local environment
-func resolveClientIP(clientIP string) string {
+// ResolveClientIP sanitizes, validates IP format, and falls back to public echo if running in local environment.
+func (s *whoisService) ResolveClientIP(clientIP string) string {
 	if strings.Contains(clientIP, ",") {
 		clientIP = strings.TrimSpace(strings.Split(clientIP, ",")[0])
 	}
 	clientIP = strings.TrimPrefix(clientIP, "::ffff:")
 	parsed := net.ParseIP(clientIP)
 
-	// If invalid IP, local, or loopback, try public echo or default to RIPE
 	if parsed == nil || clientIP == "" || parsed.IsLoopback() || parsed.IsUnspecified() || parsed.IsPrivate() {
 		var echoRes struct {
 			IP string `json:"ip"`
 		}
-		if err := fetchJSON("https://api.ipify.org?format=json", &echoRes); err == nil && echoRes.IP != "" && net.ParseIP(echoRes.IP) != nil {
+		if err := s.fetchJSON("https://api.ipify.org?format=json", &echoRes); err == nil && echoRes.IP != "" && net.ParseIP(echoRes.IP) != nil {
 			clientIP = echoRes.IP
 		} else {
 			clientIP = "193.0.6.139"
@@ -794,8 +831,8 @@ func resolveClientIP(clientIP string) string {
 	return clientIP
 }
 
-// Core Country Lookup logic
-func executeCountryLookup(code string) (*models.CountryIpResource, error) {
+// LookupCountry retrieves officially delegated IP prefixes and ASNs for an ISO country code.
+func (s *whoisService) LookupCountry(code string) (*models.CountryIpResource, error) {
 	code = strings.ToUpper(strings.TrimSpace(code))
 	if len(code) != 2 || code[0] < 'A' || code[0] > 'Z' || code[1] < 'A' || code[1] > 'Z' {
 		return nil, fmt.Errorf("invalid country code: must be a 2-letter ISO 3166-1 alpha-2 code")
@@ -807,8 +844,7 @@ func executeCountryLookup(code string) (*models.CountryIpResource, error) {
 	var cached models.CountryIpResource
 	if found, _ := database.GetJSON(cacheKey, &cached); found {
 		cached.Cached = true
-		// Trigger background resolution for any remaining unresolved ISP names if not already running
-		go startBackgroundCountryIspResolution(code, cached.ASNs, cached.IPv4, cached.IPv6)
+		go s.startBackgroundCountryIspResolution(code, cached.ASNs, cached.IPv4, cached.IPv6)
 		return &cached, nil
 	}
 
@@ -829,9 +865,9 @@ func executeCountryLookup(code string) (*models.CountryIpResource, error) {
 	}
 
 	u := fmt.Sprintf("https://stat.ripe.net/data/country-resource-list/data.json?resource=%s&v4_format=prefix", url.QueryEscape(code))
-	if err := fetchJSON(u, &ripeStatRes); err != nil {
+	if err := s.fetchJSON(u, &ripeStatRes); err != nil {
 		u2 := fmt.Sprintf("https://stat.ripe.net/data/country-resource-list/data.json?resource=%s", url.QueryEscape(code))
-		_ = fetchJSON(u2, &ripeStatRes)
+		_ = s.fetchJSON(u2, &ripeStatRes)
 	}
 
 	var asns []int
@@ -858,7 +894,6 @@ func executeCountryLookup(code string) (*models.CountryIpResource, error) {
 		}
 	}
 
-	// Pre-populate any ASN names and prefix orgs already in cache
 	asNamesMap := make(map[string]string)
 	for _, asn := range asns {
 		asnStr := strconv.Itoa(asn)
@@ -899,31 +934,26 @@ func executeCountryLookup(code string) (*models.CountryIpResource, error) {
 		Cached:                      false,
 	}
 
-	// Store in Redis with daily end-of-day TTL
 	_ = database.SetJSON(cacheKey, result, dailyTtl)
 
-	// Start background fetching & caching of selected country's ISP / Org names
-	go startBackgroundCountryIspResolution(code, asns, ripeStatRes.Data.Resources.Ipv4, ripeStatRes.Data.Resources.Ipv6)
+	go s.startBackgroundCountryIspResolution(code, asns, ripeStatRes.Data.Resources.Ipv4, ripeStatRes.Data.Resources.Ipv6)
 
 	return &result, nil
 }
 
-// Background goroutine to resolve and cache ASN names and Prefix orgs for a country
-func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []string, ipv6 []string) {
-	if _, loaded := countryBgResolving.LoadOrStore(countryCode, true); loaded {
+func (s *whoisService) startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []string, ipv6 []string) {
+	if _, loaded := s.countryBgResolving.LoadOrStore(countryCode, true); loaded {
 		return
 	}
-	defer countryBgResolving.Delete(countryCode)
+	defer s.countryBgResolving.Delete(countryCode)
 
 	dailyTtl := getEndOfDayTtl()
 	cacheKey := "country_res_" + countryCode
 
-	// Cap ASNs to resolve to top 100 to avoid excessive upstream queries
 	if len(asns) > 100 {
 		asns = asns[:100]
 	}
 
-	// 1. Batch resolve AS Names in chunks of 50
 	var missingAsns []string
 	for _, asn := range asns {
 		asnStr := strconv.Itoa(asn)
@@ -944,7 +974,7 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 			} `json:"data"`
 		}
 		u := fmt.Sprintf("https://stat.ripe.net/data/as-names/data.json?resource=%s", strings.Join(chunk, ","))
-		if err := fetchJSON(u, &asRes); err == nil && asRes.Data.Names != nil {
+		if err := s.fetchJSON(u, &asRes); err == nil && asRes.Data.Names != nil {
 			for k, v := range asRes.Data.Names {
 				_ = database.SetJSON("asn_name_"+k, v, dailyTtl)
 				_ = database.SetJSON("asn_name_AS"+k, v, dailyTtl)
@@ -965,7 +995,6 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	// 2. Concurrently resolve Prefix Organizations (capped at 100 prefixes)
 	allPrefixes := append([]string{}, ipv4...)
 	allPrefixes = append(allPrefixes, ipv6...)
 	const maxPrefixResolution = 100
@@ -1005,7 +1034,7 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 					} `json:"data"`
 				}
 				u := fmt.Sprintf("https://stat.ripe.net/data/prefix-overview/data.json?resource=%s", url.QueryEscape(prefix))
-				if err := fetchJSON(u, &pRes); err == nil && len(pRes.Data.Asns) > 0 && pRes.Data.Asns[0].Holder != "" {
+				if err := s.fetchJSON(u, &pRes); err == nil && len(pRes.Data.Asns) > 0 && pRes.Data.Asns[0].Holder != "" {
 					holder := pRes.Data.Asns[0].Holder
 					_ = database.SetJSON("prefix_org_"+prefix, holder, dailyTtl)
 
@@ -1025,30 +1054,29 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 	wg.Wait()
 }
 
-// executeResolveOrgs resolves ASN and prefix organization names
-func executeResolveOrgs(asns []interface{}, prefixes []string) map[string]string {
+// ResolveOrgs bulk resolves organization and ISP names for ASNs and CIDR prefixes.
+func (s *whoisService) ResolveOrgs(asns []interface{}, prefixes []string) map[string]string {
 	dailyTtl := getEndOfDayTtl()
 	orgs := make(map[string]string)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	// Resolve AS names
 	var missingAsns []string
 	for _, a := range asns {
-		var s string
+		var str string
 		switch v := a.(type) {
 		case float64:
-			s = strconv.Itoa(int(v))
+			str = strconv.Itoa(int(v))
 		case string:
-			s = strings.TrimPrefix(strings.ToUpper(v), "AS")
+			str = strings.TrimPrefix(strings.ToUpper(v), "AS")
 		}
-		if s != "" {
+		if str != "" {
 			var name string
-			if found, _ := database.GetJSON("asn_name_"+s, &name); found && name != "" {
-				orgs["AS"+s] = name
-				orgs[s] = name
+			if found, _ := database.GetJSON("asn_name_"+str, &name); found && name != "" {
+				orgs["AS"+str] = name
+				orgs[str] = name
 			} else {
-				missingAsns = append(missingAsns, s)
+				missingAsns = append(missingAsns, str)
 			}
 		}
 	}
@@ -1061,7 +1089,7 @@ func executeResolveOrgs(asns []interface{}, prefixes []string) map[string]string
 				} `json:"data"`
 			}
 			u := fmt.Sprintf("https://stat.ripe.net/data/as-names/data.json?resource=%s", strings.Join(missingAsns, ","))
-			if err := fetchJSON(u, &asRes); err == nil && asRes.Data.Names != nil {
+			if err := s.fetchJSON(u, &asRes); err == nil && asRes.Data.Names != nil {
 				mu.Lock()
 				for k, v := range asRes.Data.Names {
 					orgs["AS"+k] = v
@@ -1074,7 +1102,6 @@ func executeResolveOrgs(asns []interface{}, prefixes []string) map[string]string
 		})
 	}
 
-	// Resolve Prefixes with bounded concurrency
 	var missingPrefixes []string
 	for _, p := range prefixes {
 		var org string
@@ -1100,7 +1127,7 @@ func executeResolveOrgs(asns []interface{}, prefixes []string) map[string]string
 				} `json:"data"`
 			}
 			u := fmt.Sprintf("https://stat.ripe.net/data/prefix-overview/data.json?resource=%s", url.QueryEscape(prefix))
-			if err := fetchJSON(u, &pRes); err == nil && len(pRes.Data.Asns) > 0 && pRes.Data.Asns[0].Holder != "" {
+			if err := s.fetchJSON(u, &pRes); err == nil && len(pRes.Data.Asns) > 0 && pRes.Data.Asns[0].Holder != "" {
 				holder := pRes.Data.Asns[0].Holder
 				mu.Lock()
 				orgs[prefix] = holder
@@ -1114,8 +1141,8 @@ func executeResolveOrgs(asns []interface{}, prefixes []string) map[string]string
 	return orgs
 }
 
-// executeBatchLookup inspects up to 50 IP addresses in parallel
-func executeBatchLookup(items []string) []models.BatchItemResult {
+// BatchLookup inspects up to 50 IP addresses in parallel.
+func (s *whoisService) BatchLookup(items []string) []models.BatchItemResult {
 	if len(items) > 50 {
 		items = items[:50]
 	}
@@ -1127,7 +1154,7 @@ func executeBatchLookup(items []string) []models.BatchItemResult {
 		idx := i
 		target := strings.TrimSpace(item)
 		wg.Go(func() {
-			rec, err := executeIpLookup(target)
+			rec, err := s.LookupIP(target)
 			if err != nil {
 				results[idx] = models.BatchItemResult{
 					Query:  target,
