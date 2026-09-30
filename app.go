@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/cache"
 	"github.com/gofiber/fiber/v3/middleware/compress"
 	"github.com/gofiber/fiber/v3/middleware/cors"
+	"github.com/gofiber/fiber/v3/middleware/helmet"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
 	"github.com/gofiber/fiber/v3/middleware/static"
 	"github.com/joho/godotenv"
@@ -42,25 +43,77 @@ func init() {
 	// 3. Load dynamic plugins
 	loadPlugins()
 
-	// 4. Initialize Redis client (strictly required)
-	if _, err := database.Init(); err != nil {
-		log.Fatalf("Fatal: Redis connection required. Could not connect to %s: %v", config.RedisURL, err)
+	// 4. Initialize Redis client (strictly required in production)
+	isTest := strings.HasSuffix(os.Args[0], ".test") || strings.HasSuffix(os.Args[0], ".test.exe")
+	if !isTest {
+		for _, arg := range os.Args {
+			if strings.HasPrefix(arg, "-test.") {
+				isTest = true
+				break
+			}
+		}
 	}
 
+	if _, err := database.Init(); err != nil {
+		if isTest {
+			log.Printf("Notice: Redis not connected during test run: %v", err)
+		} else {
+			log.Fatalf("Fatal: Redis connection required. Could not connect to %s: %v", config.RedisURL, err)
+		}
+	}
+
+	// Configure Fiber with body size limit
 	app = fiber.New(fiber.Config{
-		AppName: fmt.Sprintf("IP-Hub %s", config.Version),
+		AppName:   fmt.Sprintf("IP-Hub %s", config.Version),
+		BodyLimit: 2 * 1024 * 1024,
 	})
 
-	// CORS Middleware
-	app.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"*"},
-		AllowHeaders: []string{"Origin, Content-Type, Accept"},
-		AllowMethods: []string{"GET, POST, OPTIONS"},
+	// Security headers
+	app.Use(helmet.New(helmet.Config{
+		XSSProtection:             "0",
+		ContentTypeNosniff:        "nosniff",
+		XFrameOptions:             "SAMEORIGIN",
+		ReferrerPolicy:            "strict-origin-when-cross-origin",
+		CrossOriginOpenerPolicy:   "same-origin",
+		CrossOriginResourcePolicy: "same-origin",
 	}))
 
-	// Configure rate limiter for /lookup and /api/whois/batch
+	// CORS middleware
+	allowedOrigins := []string{"https://ip-hub.ir", "http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000"}
+	if envOrigins := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS")); envOrigins != "" {
+		if envOrigins == "*" {
+			allowedOrigins = []string{"*"}
+		} else {
+			rawParts := strings.Split(envOrigins, ",")
+			allowedOrigins = make([]string, 0, len(rawParts))
+			for _, p := range rawParts {
+				if trimmed := strings.TrimSpace(p); trimmed != "" {
+					allowedOrigins = append(allowedOrigins, trimmed)
+				}
+			}
+		}
+	}
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: allowedOrigins,
+		AllowHeaders: []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Forwarded-For", "CF-Connecting-IP"},
+		AllowMethods: []string{"GET", "POST", "HEAD", "OPTIONS"},
+	}))
+
+	// Rate limiting
 	app.Use("/lookup", limiter.New(limiter.Config{
 		Max:        100,
+		Expiration: 1 * time.Minute,
+	}))
+	app.Use("/api/whois/batch", limiter.New(limiter.Config{
+		Max:        30,
+		Expiration: 1 * time.Minute,
+	}))
+	app.Use("/api/whois/resolve-orgs", limiter.New(limiter.Config{
+		Max:        30,
+		Expiration: 1 * time.Minute,
+	}))
+	app.Use("/api", limiter.New(limiter.Config{
+		Max:        150,
 		Expiration: 1 * time.Minute,
 	}))
 

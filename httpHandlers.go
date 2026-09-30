@@ -40,14 +40,17 @@ var (
 	countryBgResolving sync.Map
 )
 
-// Helper: Check if query represents an ASN
+// Helper: Check if query represents a valid ASN
 func isAsnQuery(q string) bool {
 	clean := strings.ToUpper(strings.TrimSpace(q))
+	asnStr := clean
 	if strings.HasPrefix(clean, "AS") {
-		_, err := strconv.Atoi(clean[2:])
-		return err == nil
+		asnStr = clean[2:]
 	}
-	n, err := strconv.Atoi(clean)
+	if asnStr == "" {
+		return false
+	}
+	n, err := strconv.ParseUint(asnStr, 10, 32)
 	return err == nil && n > 0 && n <= 4294967295
 }
 
@@ -195,6 +198,10 @@ func fetchJSON(targetURL string, target interface{}) error {
 // Core Lookup IP function
 func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 	query := strings.TrimSpace(rawQuery)
+	// Validate query length bounds
+	if len(query) == 0 || len(query) > 128 {
+		return nil, fmt.Errorf("invalid query length (must be between 1 and 128 characters)")
+	}
 	cacheKey := "whois_ip_" + query
 	var cachedRecord models.WhoisRecord
 	if found, _ := database.GetJSON(cacheKey, &cachedRecord); found {
@@ -449,9 +456,9 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 		}
 	})
 
-	// 5. Reverse DNS
+	// 5. Reverse DNS (validate IP format before lookup)
 	wg.Go(func() {
-		if !strings.Contains(query, "/") {
+		if !strings.Contains(query, "/") && net.ParseIP(query) != nil {
 			names, err := net.LookupAddr(query)
 			if err == nil && len(names) > 0 {
 				reverseDns = strings.TrimSuffix(names[0], ".")
@@ -684,7 +691,12 @@ func executeIpLookup(rawQuery string) (*models.WhoisRecord, error) {
 func executeAsnLookup(rawQuery string) (*models.AsnRecord, error) {
 	cleanAsn := strings.ToUpper(strings.TrimSpace(rawQuery))
 	asnNumStr := strings.TrimPrefix(cleanAsn, "AS")
-	asnNum, _ := strconv.Atoi(asnNumStr)
+	// Parse unsigned ASN within valid 32-bit ASN range
+	asnUint, err := strconv.ParseUint(asnNumStr, 10, 32)
+	if err != nil || asnUint == 0 || asnUint > 4294967295 {
+		return nil, fmt.Errorf("invalid Autonomous System Number")
+	}
+	asnNum := int(asnUint)
 
 	cacheKey := "whois_asn_" + asnNumStr
 	var cachedRecord models.AsnRecord
@@ -783,6 +795,14 @@ func handleRequest(c fiber.Ctx) error {
 		})
 	}
 
+	cleanCountry := strings.ToUpper(strings.TrimSpace(request.Country))
+	if len(cleanCountry) != 2 || cleanCountry[0] < 'A' || cleanCountry[0] > 'Z' || cleanCountry[1] < 'A' || cleanCountry[1] > 'Z' {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid country code: must be a 2-letter ISO 3166-1 alpha-2 code",
+		})
+	}
+	request.Country = cleanCountry
+
 	info, err := database.DB.GetOrSet(request.Country, func() (*pluginBase.Lookup, error) {
 		result := lookup(request.Country)
 		return &result, nil
@@ -864,19 +884,20 @@ func handleWhoisLookup(c fiber.Ctx) error {
 	})
 }
 
-// resolveClientIP sanitizes and falls back to public echo if running in local environment
+// resolveClientIP sanitizes, validates IP format, and falls back to public echo if running in local environment
 func resolveClientIP(clientIP string) string {
 	if strings.Contains(clientIP, ",") {
 		clientIP = strings.TrimSpace(strings.Split(clientIP, ",")[0])
 	}
 	clientIP = strings.TrimPrefix(clientIP, "::ffff:")
+	parsed := net.ParseIP(clientIP)
 
-	// If local or loopback, try public echo or default to RIPE
-	if clientIP == "" || clientIP == "127.0.0.1" || clientIP == "::1" || clientIP == "0.0.0.0" || strings.HasPrefix(clientIP, "10.") || strings.HasPrefix(clientIP, "192.168.") {
+	// If invalid IP, local, or loopback, try public echo or default to RIPE
+	if parsed == nil || clientIP == "" || parsed.IsLoopback() || parsed.IsUnspecified() || parsed.IsPrivate() {
 		var echoRes struct {
 			IP string `json:"ip"`
 		}
-		if err := fetchJSON("https://api.ipify.org?format=json", &echoRes); err == nil && echoRes.IP != "" {
+		if err := fetchJSON("https://api.ipify.org?format=json", &echoRes); err == nil && echoRes.IP != "" && net.ParseIP(echoRes.IP) != nil {
 			clientIP = echoRes.IP
 		} else {
 			clientIP = "193.0.6.139"
@@ -921,9 +942,9 @@ func handleWhoisCountry(c fiber.Ctx) error {
 	}
 
 	code := strings.ToUpper(strings.TrimSpace(body.Code))
-	if code == "" {
+	if len(code) != 2 || code[0] < 'A' || code[0] > 'Z' || code[1] < 'A' || code[1] > 'Z' {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Country code required",
+			"error": "Country code must be a 2-letter ISO 3166-1 alpha-2 code",
 		})
 	}
 
@@ -940,8 +961,8 @@ func handleWhoisCountry(c fiber.Ctx) error {
 // Core Country Lookup logic
 func executeCountryLookup(code string) (*models.CountryIpResource, error) {
 	code = strings.ToUpper(strings.TrimSpace(code))
-	if code == "" {
-		return nil, fmt.Errorf("country code required")
+	if len(code) != 2 || code[0] < 'A' || code[0] > 'Z' || code[1] < 'A' || code[1] > 'Z' {
+		return nil, fmt.Errorf("invalid country code: must be a 2-letter ISO 3166-1 alpha-2 code")
 	}
 
 	dailyTtl := getEndOfDayTtl()
@@ -1051,7 +1072,7 @@ func executeCountryLookup(code string) (*models.CountryIpResource, error) {
 	return &result, nil
 }
 
-// Background goroutine to resolve and cache all ASN names and Prefix orgs for a country
+// Background goroutine to resolve and cache ASN names and Prefix orgs for a country
 func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []string, ipv6 []string) {
 	if _, loaded := countryBgResolving.LoadOrStore(countryCode, true); loaded {
 		return
@@ -1060,6 +1081,11 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 
 	dailyTtl := getEndOfDayTtl()
 	cacheKey := "country_res_" + countryCode
+
+	// Cap ASNs to resolve to top 100 to avoid excessive upstream queries
+	if len(asns) > 100 {
+		asns = asns[:100]
+	}
 
 	// 1. Batch resolve AS Names in chunks of 50
 	var missingAsns []string
@@ -1103,9 +1129,13 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	// 2. Concurrently resolve Prefix Organizations
+	// 2. Concurrently resolve Prefix Organizations (capped at 100 prefixes)
 	allPrefixes := append([]string{}, ipv4...)
 	allPrefixes = append(allPrefixes, ipv6...)
+	const maxPrefixResolution = 100
+	if len(allPrefixes) > maxPrefixResolution {
+		allPrefixes = allPrefixes[:maxPrefixResolution]
+	}
 
 	var missingPrefixes []string
 	for _, p := range allPrefixes {
@@ -1119,7 +1149,7 @@ func startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []
 		return
 	}
 
-	workerCount := 6
+	workerCount := 4
 	prefixChan := make(chan string, len(missingPrefixes))
 	for _, p := range missingPrefixes {
 		prefixChan <- p
@@ -1210,7 +1240,7 @@ func executeResolveOrgs(asns []interface{}, prefixes []string) map[string]string
 		}()
 	}
 
-	// Resolve Prefixes
+	// Resolve Prefixes with bounded concurrency
 	var missingPrefixes []string
 	for _, p := range prefixes {
 		var org string
@@ -1221,9 +1251,15 @@ func executeResolveOrgs(asns []interface{}, prefixes []string) map[string]string
 		}
 	}
 
+	sem := make(chan struct{}, 6)
 	for _, p := range missingPrefixes {
 		prefix := p
-		wg.Go(func() {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
 			var pRes struct {
 				Data struct {
 					Asns []struct {
@@ -1239,7 +1275,7 @@ func executeResolveOrgs(asns []interface{}, prefixes []string) map[string]string
 				mu.Unlock()
 				_ = database.SetJSON("prefix_org_"+prefix, holder, dailyTtl)
 			}
-		})
+		}()
 	}
 
 	wg.Wait()
@@ -1255,6 +1291,13 @@ func handleWhoisResolveOrgs(c fiber.Ctx) error {
 	if err := c.Bind().Body(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
+		})
+	}
+
+	// Enforce maximum item limit
+	if len(body.Prefixes) > 50 || len(body.Asns) > 50 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Exceeded maximum allowed items: limit is 50 prefixes and 50 ASNs per request",
 		})
 	}
 
@@ -1309,7 +1352,14 @@ func handleWhoisBatch(c fiber.Ctx) error {
 	}
 	if err := c.Bind().Body(&body); err != nil || len(body.Items) == 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Request body must contain 'items' array",
+			"error": "Request body must contain non-empty 'items' array",
+		})
+	}
+
+	// Reject batches larger than 50 items
+	if len(body.Items) > 50 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Batch size exceeds maximum limit of 50 items",
 		})
 	}
 
@@ -1327,6 +1377,11 @@ func handleWhoisSubnet(c fiber.Ctx) error {
 	if ip == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Query parameter 'ip' is required",
+		})
+	}
+	if len(ip) > 64 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Query parameter 'ip' exceeds maximum length",
 		})
 	}
 

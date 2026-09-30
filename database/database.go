@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/kzeedev/IP-Hub/config"
@@ -57,8 +58,23 @@ func (c *LookupCache) GetClient() *redis.Client {
 	return c.client
 }
 
+// SanitizeKey normalizes cache keys by stripping whitespace and control characters and enforcing a length limit.
+func SanitizeKey(key string) string {
+	clean := strings.Map(func(r rune) rune {
+		if r <= 32 || r == 127 {
+			return -1
+		}
+		return r
+	}, key)
+	if len(clean) > 128 {
+		return clean[:128]
+	}
+	return clean
+}
+
 // SetJSON serializes any data structure to JSON and saves it in Redis with a TTL.
 func (c *LookupCache) SetJSON(key string, data interface{}, ttl time.Duration) error {
+	key = SanitizeKey(key)
 	bytes, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON for key %s: %w", key, err)
@@ -69,6 +85,7 @@ func (c *LookupCache) SetJSON(key string, data interface{}, ttl time.Duration) e
 // GetJSON retrieves a JSON string from Redis and unmarshals it into target.
 // Returns (true, nil) if key exists, (false, nil) if key was not found.
 func (c *LookupCache) GetJSON(key string, target interface{}) (bool, error) {
+	key = SanitizeKey(key)
 	val, err := c.client.Get(c.ctx, key).Result()
 	if err != nil {
 		if err == redis.Nil {
@@ -84,12 +101,14 @@ func (c *LookupCache) GetJSON(key string, target interface{}) (bool, error) {
 
 // SetString stores a raw string in Redis with a TTL.
 func (c *LookupCache) SetString(key string, value string, ttl time.Duration) error {
+	key = SanitizeKey(key)
 	return c.client.Set(c.ctx, key, value, ttl).Err()
 }
 
 // GetString retrieves a raw string from Redis.
 // Returns (value, true, nil) if key exists, ("", false, nil) if key was not found.
 func (c *LookupCache) GetString(key string) (string, bool, error) {
+	key = SanitizeKey(key)
 	val, err := c.client.Get(c.ctx, key).Result()
 	if err != nil {
 		if err == redis.Nil {
@@ -102,7 +121,11 @@ func (c *LookupCache) GetString(key string) (string, bool, error) {
 
 // Delete removes one or more keys from Redis.
 func (c *LookupCache) Delete(keys ...string) error {
-	return c.client.Del(c.ctx, keys...).Err()
+	sanitized := make([]string, len(keys))
+	for i, k := range keys {
+		sanitized[i] = SanitizeKey(k)
+	}
+	return c.client.Del(c.ctx, sanitized...).Err()
 }
 
 // Set stores a pluginBase.Lookup object with expiration until the next 6-hour UTC block.

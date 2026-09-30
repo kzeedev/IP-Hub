@@ -236,8 +236,8 @@ func setupOpenAPI(app *fiber.App) huma.API {
 		Tags:        []string{"Country Resources"},
 	}, func(ctx context.Context, input *WhoisCountryInput) (*WhoisCountryOutput, error) {
 		code := strings.ToUpper(strings.TrimSpace(input.Body.Code))
-		if code == "" {
-			return nil, huma.Error400BadRequest("Country code required")
+		if len(code) != 2 || code[0] < 'A' || code[0] > 'Z' || code[1] < 'A' || code[1] > 'Z' {
+			return nil, huma.Error400BadRequest("Country code must be a 2-letter ISO 3166-1 alpha-2 code (e.g. US, DE, IR)")
 		}
 
 		res, err := executeCountryLookup(code)
@@ -259,6 +259,10 @@ func setupOpenAPI(app *fiber.App) huma.API {
 		Description: "Resolves holder and ISP organization names for lists of Autonomous System Numbers (ASNs) and CIDR prefixes.",
 		Tags:        []string{"Country Resources"},
 	}, func(ctx context.Context, input *WhoisResolveOrgsInput) (*WhoisResolveOrgsOutput, error) {
+		if len(input.Body.Prefixes) > 50 || len(input.Body.Asns) > 50 {
+			return nil, huma.Error400BadRequest("Exceeded maximum allowed items: limit is 50 prefixes and 50 ASNs per request")
+		}
+
 		orgs := executeResolveOrgs(input.Body.Asns, input.Body.Prefixes)
 		resp := &WhoisResolveOrgsOutput{}
 		resp.Body.Orgs = orgs
@@ -276,6 +280,9 @@ func setupOpenAPI(app *fiber.App) huma.API {
 	}, func(ctx context.Context, input *WhoisBatchInput) (*WhoisBatchOutput, error) {
 		if len(input.Body.Items) == 0 {
 			return nil, huma.Error400BadRequest("Request body must contain 'items' array")
+		}
+		if len(input.Body.Items) > 50 {
+			return nil, huma.Error400BadRequest("Batch size exceeds maximum limit of 50 items")
 		}
 
 		results := executeBatchLookup(input.Body.Items)
@@ -297,6 +304,9 @@ func setupOpenAPI(app *fiber.App) huma.API {
 		ip := strings.TrimSpace(input.IP)
 		if ip == "" {
 			return nil, huma.Error400BadRequest("Query parameter 'ip' is required")
+		}
+		if len(ip) > 64 {
+			return nil, huma.Error400BadRequest("Query parameter 'ip' exceeds maximum length")
 		}
 
 		var cidrPtr *int

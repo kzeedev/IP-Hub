@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"net"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"plugin"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/kzeedev/IP-Hub/config"
@@ -16,27 +19,51 @@ import (
 	country "github.com/mikekonan/go-countries"
 )
 
+var lookupHttpClient = &http.Client{
+	Timeout: 7 * time.Second,
+}
+
 func lookup(countryCode string) pluginBase.Lookup {
-	url := fmt.Sprintf("%s%v", config.LookupEndpoint, countryCode)
-	fmt.Println(url)
-	res, err := http.Get(url)
+	cleanCode := strings.ToUpper(strings.TrimSpace(countryCode))
+	// Validate ISO 3166-1 alpha-2 country code
+	if len(cleanCode) != 2 || cleanCode[0] < 'A' || cleanCode[0] > 'Z' || cleanCode[1] < 'A' || cleanCode[1] > 'Z' {
+		return pluginBase.Lookup{
+			CountryCode: cleanCode,
+			CountryName: "Invalid Country",
+		}
+	}
+
+	targetURL := fmt.Sprintf("%s%s", config.LookupEndpoint, url.QueryEscape(cleanCode))
+	req, err := http.NewRequest("GET", targetURL, nil)
 	if err != nil {
-		fmt.Println(err)
+		return pluginBase.Lookup{CountryCode: cleanCode}
+	}
+	req.Header.Set("User-Agent", "IP-Hub-Server/2.0")
+	req.Header.Set("Accept", "application/json")
+
+	res, err := lookupHttpClient.Do(req)
+	if err != nil {
+		fmt.Printf("Lookup HTTP error: %v\n", err)
+		return pluginBase.Lookup{CountryCode: cleanCode}
 	}
 	defer res.Body.Close()
 
-	var response models.RipeResult
-
-	err = json.NewDecoder(res.Body).Decode(&response)
-	if err != nil {
-		fmt.Println(err)
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return pluginBase.Lookup{CountryCode: cleanCode}
 	}
 
-	countryName, ok := country.ByAlpha2Code(country.Alpha2Code(countryCode))
+	var response models.RipeResult
+	err = json.NewDecoder(res.Body).Decode(&response)
+	if err != nil {
+		fmt.Printf("Lookup JSON decode error: %v\n", err)
+		return pluginBase.Lookup{CountryCode: cleanCode}
+	}
+
+	countryName, ok := country.ByAlpha2Code(country.Alpha2Code(cleanCode))
 
 	result := pluginBase.Lookup{
 		UpdatedAt:   response.Data.QueryTime,
-		CountryCode: countryCode,
+		CountryCode: cleanCode,
 		ASN:         response.Data.Resources.Asn,
 		IPv4:        response.Data.Resources.Ipv4,
 		IPv6:        response.Data.Resources.Ipv6,
@@ -44,7 +71,7 @@ func lookup(countryCode string) pluginBase.Lookup {
 	if ok {
 		result.CountryName = countryName.NameStr()
 	} else {
-		result.CountryName = countryCode
+		result.CountryName = cleanCode
 	}
 
 	return result
@@ -107,7 +134,7 @@ func loadPlugins() {
 	}
 }
 
-// ExtractClientIP extracts the real client IP from Cloudflare or standard proxy headers
+// ExtractClientIP extracts and validates the client IP from proxy headers or socket.
 func ExtractClientIP(c fiber.Ctx) string {
 	ip := c.Get("CF-Connecting-IP")
 	if ip == "" {
@@ -122,5 +149,9 @@ func ExtractClientIP(c fiber.Ctx) string {
 	if strings.Contains(ip, ",") {
 		ip = strings.TrimSpace(strings.Split(ip, ",")[0])
 	}
-	return strings.TrimPrefix(ip, "::ffff:")
+	ip = strings.TrimPrefix(ip, "::ffff:")
+	if parsed := net.ParseIP(ip); parsed == nil {
+		ip = c.IP()
+	}
+	return ip
 }
