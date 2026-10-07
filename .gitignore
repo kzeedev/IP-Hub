@@ -21,3 +21,5 @@ IP-Hub.exe
 .vscode/
 .localbuilder/
 .gocache/
+.agents/
+skills-lock.json

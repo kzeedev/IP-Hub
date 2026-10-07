@@ -2,8 +2,6 @@ User-agent: *
 Allow: /
 Disallow: /api/
 Disallow: /cdn-cgi/
-Disallow: /lookup/
-Disallow: /fa/lookup/
 
 Sitemap: https://ip-hub.ir/sitemap.xml
 Content-Signal: ai-train=yes, search=yes, ai-input=yes
