@@ -117,7 +117,10 @@ func init() {
 
 	// Configure cache for static assets
 	app.Use("/assets", cache.New(cache.Config{
-		Expiration: 24 * time.Hour,
+		Expiration: 7 * (24 * time.Hour),
+	}))
+	app.Use("/img", cache.New(cache.Config{
+		Expiration: 7 * (24 * time.Hour),
 	}))
 
 	// Configure compression
@@ -133,8 +136,9 @@ func init() {
 
 	// Static assets
 	app.Use("/", static.New("./web/dist"))
-	app.Use("/", static.New("./dist"))
 	app.Use("/public", static.New("./web/public"))
+	app.Use("/assets", static.New("./web/dist/assets"))
+	app.Use("/img", static.New("./web/dist/img"))
 
 	// Route non-API GET requests to SPA index.html
 	app.Get("*", func(c fiber.Ctx) error {
@@ -142,6 +146,7 @@ func init() {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Endpoint not found"})
 		}
 		c.Set("Vary", "Accept")
+		c.Set("Cache-Control", "no-cache")
 		if _, err := os.Stat("./web/dist/index.html"); err == nil {
 			return c.SendFile("./web/dist/index.html")
 		}

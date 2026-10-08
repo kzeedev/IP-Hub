@@ -271,7 +271,7 @@ description: پلتفرم متن‌باز و پرسرعت هوش شبکه، اس
 	return `---
 title: IP-Hub - Autonomous System & IP Intelligence Platform
 description: High-performance network intelligence platform, real-time BGP routing, live WHOIS lookup, country CIDR delegations, and edge firewall rule generator.
-image: https://ip-hub.ir/img/logo.webp
+image: https://ip-hub.ir/assets/img/logo.webp
 ---
 
 # IP-Hub Network Intelligence Platform

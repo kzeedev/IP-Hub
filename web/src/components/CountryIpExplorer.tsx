@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from 'react';
 import {
   Globe2,
   Search,
@@ -28,6 +28,7 @@ import { copyToClipboard, downloadText } from '../utils/helpers';
 import { generateFirewallConfig } from '../utils/formatters';
 import { getRouteUrl } from '../utils/router';
 import { useLanguage } from '../i18n/LanguageContext';
+import { FlagIcon } from './FlagIcon';
 
 interface CountryIpExplorerProps {
   onInspectResource: (resource: string) => void;
@@ -41,6 +42,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   const { language, t, isRtl } = useLanguage();
   const [selectedCountry, setSelectedCountry] = useState<string>('');
   const [countrySearchQuery, setCountrySearchQuery] = useState<string>('');
+  const deferredCountrySearch = useDeferredValue(countrySearchQuery);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
 
   const [data, setData] = useState<CountryIpResource | null>(null);
@@ -50,6 +52,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   // Table view Tab & Filters
   const [activeTab, setActiveTab] = useState<TabType>('ipv4');
   const [listSearch, setListSearch] = useState<string>('');
+  const deferredListSearch = useDeferredValue(listSearch);
   const [cidrFilter, setCidrFilter] = useState<string>('all');
   const [page, setPage] = useState<number>(1);
   const itemsPerPage = 50;
@@ -114,14 +117,14 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
 
   // Filter countries for dropdown with bilingual name support
   const filteredCountries = useMemo(() => {
-    const q = countrySearchQuery.toLowerCase().trim();
+    const q = deferredCountrySearch.toLowerCase().trim();
     return ALL_COUNTRIES.map(c => ({
       ...c,
       name: language === 'fa' ? c.faName : c.name,
     })).filter(
       c => !q || c.name.toLowerCase().includes(q) || c.faName.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || c.region.toLowerCase().includes(q)
     );
-  }, [countrySearchQuery, language]);
+  }, [deferredCountrySearch, language]);
 
   const popularCountries = useMemo(() => {
     return POPULAR_COUNTRIES.map(c => ({
@@ -150,7 +153,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   // Filtered list for table
   const filteredList = useMemo(() => {
     if (!data) return [];
-    const q = listSearch.trim().toLowerCase();
+    const q = deferredListSearch.trim().toLowerCase();
 
     if (activeTab === 'ipv4') {
       return data.ipv4.filter(prefix => {
@@ -177,7 +180,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
           return !q || asnStr.toLowerCase().includes(q) || org.includes(q);
         });
     }
-  }, [data, activeTab, listSearch, cidrFilter, resolvedOrgs]);
+  }, [data, activeTab, deferredListSearch, cidrFilter, resolvedOrgs]);
 
   const totalPages = Math.max(1, Math.ceil(filteredList.length / itemsPerPage));
   const paginatedList = useMemo(() => {
@@ -327,7 +330,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
               className="w-full px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-left text-sm font-semibold text-white flex items-center justify-between gap-2 transition-colors shadow-sm"
             >
               <div className="flex items-center gap-2.5 truncate">
-                <span className={`text-xl fi fi-${currentMeta.code.toLowerCase()} fis`}></span>
+                <FlagIcon code={currentMeta.code} className="w-5 h-3.5 rounded-[2px]" />
                 <span className="truncate">{currentMeta.name}</span>
                 <span className="text-xs text-cyan-400 font-mono">({currentMeta.code})</span>
               </div>
@@ -368,7 +371,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
                         }`}
                     >
                       <div className="flex items-center gap-2.5 truncate">
-                        <span className={`text-base fi fi-${c.code.toLowerCase()} fis`}></span>
+                        <FlagIcon code={c.code} className="w-4 h-3 rounded-[2px]" />
                         <span className="truncate">{c.name}</span>
                       </div>
                       <span className={`text-[10px] font-mono ${c.code === selectedCountry ? 'text-cyan-100' : 'text-slate-500'}`}>
@@ -403,7 +406,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
                 : 'bg-slate-900/80 text-slate-300 border-slate-800 hover:bg-slate-800 hover:border-slate-700 hover:text-white'
                 }`}
             >
-              <span className={`fi fi-${c.code.toLowerCase()} fis rounded-xs`}></span>
+              <FlagIcon code={c.code} className="w-4 h-3 rounded-[2px]" />
               <span>{c.name}</span>
               <span className="text-[10px] font-mono text-slate-500">({c.code})</span>
             </a>
@@ -856,7 +859,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
                       )}
                       <td className="py-3 px-5 font-sans">
                         <span className="flex items-center gap-1.5 text-slate-300">
-                          <span className={`fi fi-${data.countryCode.toLowerCase()} fis`}></span>
+                          <FlagIcon code={data.countryCode} className="w-4 h-3 rounded-[2px]" />
                           <span className="font-mono text-xs">{data.countryName}</span>
                         </span>
                       </td>

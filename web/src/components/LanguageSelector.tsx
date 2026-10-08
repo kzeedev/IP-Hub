@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { parseRoute, switchRouteLanguage } from '../utils/router';
+import { FlagIcon } from './FlagIcon';
 
 export const LanguageSelector: React.FC = () => {
   const { language, setLanguage } = useLanguage();
@@ -29,7 +30,7 @@ export const LanguageSelector: React.FC = () => {
         }`}
         title="English"
       >
-        <span className="fi fi-us fis rounded-xs"></span>
+        <FlagIcon code="US" loading="eager" className="w-4 h-3 rounded-[2px]" />
         <span>EN</span>
       </a>
       <a
@@ -43,7 +44,7 @@ export const LanguageSelector: React.FC = () => {
         }`}
         title="فارسی"
       >
-        <span className="fi fi-ir fis rounded-xs"></span>
+        <FlagIcon code="IR" loading="eager" className="w-4 h-3 rounded-[2px]" />
         <span>فارسی</span>
       </a>
     </div>

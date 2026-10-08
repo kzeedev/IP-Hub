@@ -1,26 +1,43 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { WhoisRecord, AsnRecord, ActiveView, ActiveTab, SearchHistoryItem } from './types';
 import { Navbar } from './components/Navbar';
 import { SearchHeader } from './components/SearchHeader';
 import { SummaryCards } from './components/SummaryCards';
 import { OverviewTab } from './components/OverviewTab';
-import { RipeObjectsTab } from './components/RipeObjectsTab';
-import { RoutingTab } from './components/RoutingTab';
-import { AbuseTab } from './components/AbuseTab';
-import { GeolocTab } from './components/GeolocTab';
-import { SubnetTab } from './components/SubnetTab';
-import { RawWhoisTab } from './components/RawWhoisTab';
-import { AsnView } from './components/AsnView';
-import { BatchInspector } from './components/BatchInspector';
-import { SubnetCalcTool } from './components/SubnetCalcTool';
-import { CountryIpExplorer } from './components/CountryIpExplorer';
-import { SourceView } from './components/SourceView';
-import { IssuesView } from './components/IssuesView';
-import { SettingsModal } from './components/SettingsModal';
-import { SeoSection } from './components/SeoSection';
 import { useLanguage } from './i18n/LanguageContext';
 import { parseRoute, navigateRoute, updateDocumentSeoMeta } from './utils/router';
 import { Network, Database, Radio, ShieldAlert, Globe, Calculator, Terminal, AlertCircle, RefreshCw } from 'lucide-react';
+
+// Code-split Views for Core Web Vitals LCP & Bundle Size
+const CountryIpExplorer = lazy(() => import('./components/CountryIpExplorer').then(m => ({ default: m.CountryIpExplorer })));
+const BatchInspector = lazy(() => import('./components/BatchInspector').then(m => ({ default: m.BatchInspector })));
+const SubnetCalcTool = lazy(() => import('./components/SubnetCalcTool').then(m => ({ default: m.SubnetCalcTool })));
+const SourceView = lazy(() => import('./components/SourceView').then(m => ({ default: m.SourceView })));
+const IssuesView = lazy(() => import('./components/IssuesView').then(m => ({ default: m.IssuesView })));
+const SettingsModal = lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
+const AsnView = lazy(() => import('./components/AsnView').then(m => ({ default: m.AsnView })));
+const SeoSection = lazy(() => import('./components/SeoSection').then(m => ({ default: m.SeoSection })));
+
+// Lazy-loaded Secondary Tabs
+const RipeObjectsTab = lazy(() => import('./components/RipeObjectsTab').then(m => ({ default: m.RipeObjectsTab })));
+const RoutingTab = lazy(() => import('./components/RoutingTab').then(m => ({ default: m.RoutingTab })));
+const AbuseTab = lazy(() => import('./components/AbuseTab').then(m => ({ default: m.AbuseTab })));
+const GeolocTab = lazy(() => import('./components/GeolocTab').then(m => ({ default: m.GeolocTab })));
+const SubnetTab = lazy(() => import('./components/SubnetTab').then(m => ({ default: m.SubnetTab })));
+const RawWhoisTab = lazy(() => import('./components/RawWhoisTab').then(m => ({ default: m.RawWhoisTab })));
+
+const ViewFallback = () => (
+  <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-6 animate-pulse">
+    <div className="h-28 bg-slate-800/60 rounded-2xl border border-slate-700/50" />
+    <div className="h-96 bg-slate-800/40 rounded-2xl border border-slate-700/40" />
+  </div>
+);
+
+const TabFallback = () => (
+  <div className="space-y-4 animate-pulse pt-2">
+    <div className="h-72 bg-slate-850 rounded-2xl border border-slate-800" />
+  </div>
+);
 
 const DEFAULT_FALLBACK_IP = '193.0.6.139';
 
@@ -267,57 +284,59 @@ export default function App() {
       />
 
       {/* Conditional View Rendering */}
-      {activeView === 'country-ips' && (
-        <main className="flex-1">
-          <CountryIpExplorer
-            onInspectResource={(resource) => {
-              setQuery(resource);
-              handleNavigateView('lookup', { query: resource });
-              performLookup(resource, true);
-            }}
-          />
-        </main>
-      )}
+      <Suspense fallback={<ViewFallback />}>
+        {activeView === 'country-ips' && (
+          <main className="flex-1">
+            <CountryIpExplorer
+              onInspectResource={(resource) => {
+                setQuery(resource);
+                handleNavigateView('lookup', { query: resource });
+                performLookup(resource, true);
+              }}
+            />
+          </main>
+        )}
 
-      {activeView === 'batch' && (
-        <main className="flex-1">
-          <BatchInspector
-            onInspectSingle={(ip) => {
-              setQuery(ip);
-              handleNavigateView('lookup', { query: ip });
-              performLookup(ip, true);
-            }}
-          />
-        </main>
-      )}
+        {activeView === 'batch' && (
+          <main className="flex-1">
+            <BatchInspector
+              onInspectSingle={(ip) => {
+                setQuery(ip);
+                handleNavigateView('lookup', { query: ip });
+                performLookup(ip, true);
+              }}
+            />
+          </main>
+        )}
 
-      {activeView === 'subnet-calc' && (
-        <main className="flex-1">
-          <SubnetCalcTool />
-        </main>
-      )}
+        {activeView === 'subnet-calc' && (
+          <main className="flex-1">
+            <SubnetCalcTool />
+          </main>
+        )}
 
-      {activeView === 'source' && (
-        <main className="flex-1">
-          <SourceView />
-        </main>
-      )}
+        {activeView === 'source' && (
+          <main className="flex-1">
+            <SourceView />
+          </main>
+        )}
 
-      {activeView === 'issues' && (
-        <main className="flex-1">
-          <IssuesView />
-        </main>
-      )}
+        {activeView === 'issues' && (
+          <main className="flex-1">
+            <IssuesView />
+          </main>
+        )}
 
-      {activeView === 'settings' && (
-        <main className="flex-1">
-          <SettingsModal
-            isDarkTheme={isDarkTheme}
-            onToggleTheme={toggleTheme}
-            onClose={() => handleNavigateView('lookup')}
-          />
-        </main>
-      )}
+        {activeView === 'settings' && (
+          <main className="flex-1">
+            <SettingsModal
+              isDarkTheme={isDarkTheme}
+              onToggleTheme={toggleTheme}
+              onClose={() => handleNavigateView('lookup')}
+            />
+          </main>
+        )}
+      </Suspense>
 
       {activeView === 'lookup' && (
         <main className="flex-1 flex flex-col">
@@ -354,13 +373,19 @@ export default function App() {
               </div>
             )}
 
-            {/* Loading Skeleton */}
+            {/* Loading Skeleton with CLS Layout Stabilization */}
             {isLoading && !currentRecord && !asnRecord && (
               <div className="space-y-6 animate-pulse">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="h-32 bg-slate-800/60 rounded-xl border border-slate-700/50" />
+                    <div key={i} className="min-h-[142px] bg-slate-800/60 rounded-xl border border-slate-700/50" />
                   ))}
+                </div>
+                <div className="h-12 border-b border-slate-800/80 flex items-center gap-2">
+                  <div className="h-8 w-28 bg-slate-800/60 rounded-xl" />
+                  <div className="h-8 w-24 bg-slate-800/40 rounded-xl" />
+                  <div className="h-8 w-24 bg-slate-800/40 rounded-xl" />
+                  <div className="h-8 w-24 bg-slate-800/40 rounded-xl" />
                 </div>
                 <div className="h-96 bg-slate-800/40 rounded-2xl border border-slate-700/40" />
               </div>
@@ -368,18 +393,20 @@ export default function App() {
 
             {/* ASN Specialized View */}
             {!isLoading && asnRecord && (
-              <AsnView
-                record={asnRecord}
-                onSearchResource={(res) => performLookup(res, true)}
-                onBack={() => {
-                  setAsnRecord(null);
-                  if (searchHistory.length > 0) {
-                    performLookup(searchHistory[0].query, true);
-                  } else {
-                    handleMyIp();
-                  }
-                }}
-              />
+              <Suspense fallback={<ViewFallback />}>
+                <AsnView
+                  record={asnRecord}
+                  onSearchResource={(res) => performLookup(res, true)}
+                  onBack={() => {
+                    setAsnRecord(null);
+                    if (searchHistory.length > 0) {
+                      performLookup(searchHistory[0].query, true);
+                    } else {
+                      handleMyIp();
+                    }
+                  }}
+                />
+              </Suspense>
             )}
 
             {/* Regular IP / Prefix Result View */}
@@ -497,50 +524,52 @@ export default function App() {
                     />
                   )}
 
-                  {activeTab === 'routing' && (
-                    <RoutingTab
-                      routing={currentRecord.routing}
-                      cidr={currentRecord.cidr}
-                      onSearchResource={(res) => performLookup(res, true)}
-                    />
-                  )}
+                  <Suspense fallback={<TabFallback />}>
+                    {activeTab === 'routing' && (
+                      <RoutingTab
+                        routing={currentRecord.routing}
+                        cidr={currentRecord.cidr}
+                        onSearchResource={(res) => performLookup(res, true)}
+                      />
+                    )}
 
-                  {activeTab === 'abuse' && (
-                    <AbuseTab
-                      abuse={currentRecord.abuseContact}
-                      record={currentRecord}
-                    />
-                  )}
+                    {activeTab === 'abuse' && (
+                      <AbuseTab
+                        abuse={currentRecord.abuseContact}
+                        record={currentRecord}
+                      />
+                    )}
 
-                  {activeTab === 'geoloc' && (
-                    <GeolocTab
-                      geoloc={currentRecord.geolocation}
-                      ip={currentRecord.query}
-                      reverseDns={currentRecord.reverseDns}
-                    />
-                  )}
+                    {activeTab === 'geoloc' && (
+                      <GeolocTab
+                        geoloc={currentRecord.geolocation}
+                        ip={currentRecord.query}
+                        reverseDns={currentRecord.reverseDns}
+                      />
+                    )}
 
-                  {activeTab === 'subnet' && (
-                    <SubnetTab
-                      subnet={currentRecord.subnet}
-                      cidr={currentRecord.cidr}
-                    />
-                  )}
+                    {activeTab === 'subnet' && (
+                      <SubnetTab
+                        subnet={currentRecord.subnet}
+                        cidr={currentRecord.cidr}
+                      />
+                    )}
 
-                  {activeTab === 'objects' && (
-                    <RipeObjectsTab
-                      objects={currentRecord.ripeObjects}
-                      onSearchResource={(res) => performLookup(res, true)}
-                    />
-                  )}
+                    {activeTab === 'objects' && (
+                      <RipeObjectsTab
+                        objects={currentRecord.ripeObjects}
+                        onSearchResource={(res) => performLookup(res, true)}
+                      />
+                    )}
 
-                  {activeTab === 'raw' && (
-                    <RawWhoisTab
-                      rawText={currentRecord.rawWhoisText}
-                      query={currentRecord.query}
-                      source={currentRecord.source}
-                    />
-                  )}
+                    {activeTab === 'raw' && (
+                      <RawWhoisTab
+                        rawText={currentRecord.rawWhoisText}
+                        query={currentRecord.query}
+                        source={currentRecord.source}
+                      />
+                    )}
+                  </Suspense>
                 </div>
 
               </div>
@@ -551,8 +580,10 @@ export default function App() {
         </main>
       )}
 
-      {/* Rich SEO Content Section */}
-      <SeoSection />
+      {/* Rich SEO Content Section (Lazy-loaded below the fold) */}
+      <Suspense fallback={null}>
+        <SeoSection />
+      </Suspense>
 
       {/* Footer */}
       <footer className="border-t border-slate-800/80 bg-slate-950 py-6 px-4 text-center text-xs text-slate-500">

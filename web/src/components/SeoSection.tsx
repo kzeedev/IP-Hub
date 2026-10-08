@@ -15,6 +15,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { copyToClipboard } from '../utils/helpers';
 import { POPULAR_COUNTRIES } from '../utils/countries';
 import { getRouteUrl } from '../utils/router';
+import { FlagIcon } from './FlagIcon';
 
 export const SeoSection: React.FC = () => {
   const { language, t, isRtl } = useLanguage();
@@ -182,7 +183,7 @@ export const SeoSection: React.FC = () => {
                 hrefLang={language}
                 className="px-2.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/40 text-[11px] text-slate-300 hover:text-cyan-300 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
-                <span className={`fi fi-${c.code.toLowerCase()} fis rounded-xs`}></span>
+                <FlagIcon code={c.code} className="w-4 h-3 rounded-[2px]" />
                 <span>{language === 'fa' ? c.faName : c.name}</span>
                 <span className="text-[10px] text-slate-500 font-mono">({c.code})</span>
               </a>

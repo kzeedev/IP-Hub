@@ -12,7 +12,10 @@ export const SubnetCalcTool: React.FC = () => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchSubnet(ipInput, prefixLength);
+    const timer = setTimeout(() => {
+      fetchSubnet(ipInput, prefixLength);
+    }, 250);
+    return () => clearTimeout(timer);
   }, [ipInput, prefixLength]);
 
   const fetchSubnet = async (ip: string, cidr: number) => {
