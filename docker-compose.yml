@@ -1,0 +1,40 @@
+name: ip-hub
+services:
+  ip-hub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ip_hub
+    ports:
+      - "${PORT}:${PORT}"
+    environment:
+      - REDIS_URL=${REDIS_URL}
+      - PORT=${PORT}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - ip-hub-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    container_name: ip_hub_redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ip-hub-network
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+
+networks:
+  ip-hub-network:
+    driver: bridge
