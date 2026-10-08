@@ -14,6 +14,7 @@ const BatchInspector = lazy(() => import('./components/BatchInspector').then(m =
 const SubnetCalcTool = lazy(() => import('./components/SubnetCalcTool').then(m => ({ default: m.SubnetCalcTool })));
 const SourceView = lazy(() => import('./components/SourceView').then(m => ({ default: m.SourceView })));
 const IssuesView = lazy(() => import('./components/IssuesView').then(m => ({ default: m.IssuesView })));
+const NotFoundView = lazy(() => import('./components/NotFoundView').then(m => ({ default: m.NotFoundView })));
 const SettingsModal = lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
 const AsnView = lazy(() => import('./components/AsnView').then(m => ({ default: m.AsnView })));
 const SeoSection = lazy(() => import('./components/SeoSection').then(m => ({ default: m.SeoSection })));
@@ -336,6 +337,12 @@ export default function App() {
             />
           </main>
         )}
+
+        {activeView === 'not-found' && (
+          <main className="flex-1">
+            <NotFoundView onNavigate={handleNavigateView} />
+          </main>
+        )}
       </Suspense>
 
       {activeView === 'lookup' && (
@@ -425,11 +432,10 @@ export default function App() {
                   <nav className="flex space-x-1 sm:space-x-4 overflow-x-auto pb-1 scrollbar-none" aria-label="Tabs">
                     <button
                       onClick={() => setActiveTab('overview')}
-                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${
-                        activeTab === 'overview'
+                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'overview'
                           ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-bold shadow-sm'
                           : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                      }`}
+                        }`}
                     >
                       <Network className="w-4 h-4" />
                       <span>{t.tabs.overview}</span>
@@ -437,11 +443,10 @@ export default function App() {
 
                     <button
                       onClick={() => setActiveTab('routing')}
-                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${
-                        activeTab === 'routing'
+                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'routing'
                           ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30 font-bold shadow-sm'
                           : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                      }`}
+                        }`}
                     >
                       <Radio className="w-4 h-4" />
                       <span>{t.tabs.routing}</span>
@@ -452,11 +457,10 @@ export default function App() {
 
                     <button
                       onClick={() => setActiveTab('abuse')}
-                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${
-                        activeTab === 'abuse'
+                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'abuse'
                           ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30 font-bold shadow-sm'
                           : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                      }`}
+                        }`}
                     >
                       <ShieldAlert className="w-4 h-4" />
                       <span>{t.tabs.abuse}</span>
@@ -464,11 +468,10 @@ export default function App() {
 
                     <button
                       onClick={() => setActiveTab('geoloc')}
-                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${
-                        activeTab === 'geoloc'
+                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'geoloc'
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold shadow-sm'
                           : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                      }`}
+                        }`}
                     >
                       <Globe className="w-4 h-4" />
                       <span>{t.tabs.location}</span>
@@ -476,11 +479,10 @@ export default function App() {
 
                     <button
                       onClick={() => setActiveTab('subnet')}
-                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${
-                        activeTab === 'subnet'
+                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'subnet'
                           ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 font-bold shadow-sm'
                           : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                      }`}
+                        }`}
                     >
                       <Calculator className="w-4 h-4" />
                       <span>{t.tabs.subnet}</span>
@@ -488,11 +490,10 @@ export default function App() {
 
                     <button
                       onClick={() => setActiveTab('objects')}
-                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${
-                        activeTab === 'objects'
+                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'objects'
                           ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30 font-bold shadow-sm'
                           : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                      }`}
+                        }`}
                     >
                       <Database className="w-4 h-4" />
                       <span>{t.tabs.objects}</span>
@@ -503,11 +504,10 @@ export default function App() {
 
                     <button
                       onClick={() => setActiveTab('raw')}
-                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${
-                        activeTab === 'raw'
+                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'raw'
                           ? 'bg-purple-500/10 text-purple-400 border border-purple-500/30 font-bold shadow-sm'
                           : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                      }`}
+                        }`}
                     >
                       <Terminal className="w-4 h-4" />
                       <span>{t.tabs.rawWhois}</span>

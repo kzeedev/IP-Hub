@@ -77,8 +77,8 @@ export function parseRoute(
     return { view: 'lookup', query: rest ? decodeURIComponent(rest) : undefined, lang };
   }
 
-  // Fallback
-  return { view: 'lookup', lang };
+  // Fallback for invalid routes
+  return { view: 'not-found', lang };
 }
 
 /**
@@ -114,6 +114,9 @@ export function getRouteUrl(
       } else {
         subPath = '';
       }
+      break;
+    case 'not-found':
+      subPath = '/404';
       break;
     default:
       subPath = '';
@@ -204,6 +207,11 @@ export function updateDocumentSeoMeta(
     case 'issues':
       title = dict.issuesTitle;
       desc = dict.issuesDesc;
+      break;
+
+    case 'not-found':
+      title = dict.notFoundTitle;
+      desc = dict.notFoundDesc;
       break;
   }
 

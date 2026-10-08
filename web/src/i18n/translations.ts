@@ -418,7 +418,15 @@ export const translations = {
       "sourceTitle": "Open Source Project & Source Code | IP-Hub",
       "sourceDesc": "Open source repository, project roadmap, and architecture documentation.",
       "issuesTitle": "Report Issues & GitHub Contributions | IP-Hub",
-      "issuesDesc": "Submit bug reports, feature requests, and contribute pull requests to IP-Hub on GitHub."
+      "issuesDesc": "Submit bug reports, feature requests, and contribute pull requests to IP-Hub on GitHub.",
+      "notFoundTitle": "404 - Page Not Found | IP-Hub",
+      "notFoundDesc": "The page you are looking for doesn't exist or has been moved."
+    },
+    "notFound": {
+      "code": "404",
+      "title": "Page Not Found",
+      "description": "The page you are looking for doesn't exist or has been moved.",
+      "homeBtn": "Back to Home"
     }
   },
   "fa": {
@@ -840,7 +848,15 @@ export const translations = {
       "sourceTitle": "سورس پروژه و جامعه متن‌باز | IP-Hub",
       "sourceDesc": "مخزن متن‌باز، نقشه راه پروژه و مستندات معماری نرم‌افزار.",
       "issuesTitle": "گزارش باگ و ایشوهای گیت‌هاب | IP-Hub",
-      "issuesDesc": "ثبت گزارش باگ، پیشنهادات توسعه و ارسال پول‌ریکوئست در گیت‌هاب IP-Hub."
+      "issuesDesc": "ثبت گزارش باگ، پیشنهادات توسعه و ارسال پول‌ریکوئست در گیت‌هاب IP-Hub.",
+      "notFoundTitle": "۴۰۴ - صفحه یافت نشد | IP-Hub",
+      "notFoundDesc": "آدرس وارد شده اشتباه است یا صفحه مورد نظر وجود ندارد."
+    },
+    "notFound": {
+      "code": "۴۰۴",
+      "title": "صفحه مورد نظر یافت نشد",
+      "description": "آدرس وارد شده اشتباه است یا صفحه مورد نظر وجود ندارد.",
+      "homeBtn": "بازگشت به صفحه اصلی"
     }
   }
 };

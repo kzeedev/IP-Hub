@@ -1,32 +1,33 @@
-export type ActiveView = 
-  | 'lookup' 
-  | 'country-ips' 
-  | 'batch' 
-  | 'subnet-calc' 
-  | 'source' 
+export type ActiveView =
+  | 'lookup'
+  | 'country-ips'
+  | 'batch'
+  | 'subnet-calc'
+  | 'source'
   | 'issues'
-  | 'settings';
+  | 'settings'
+  | 'not-found';
 
-export type ActiveTab = 
-  | 'overview' 
-  | 'objects' 
-  | 'routing' 
-  | 'abuse' 
-  | 'geoloc' 
-  | 'subnet' 
+export type ActiveTab =
+  | 'overview'
+  | 'objects'
+  | 'routing'
+  | 'abuse'
+  | 'geoloc'
+  | 'subnet'
   | 'raw';
 
 export type Language = 'en' | 'fa';
 
-export type ExportFormat = 
-  | 'mikrotik' 
-  | 'cisco' 
+export type ExportFormat =
+  | 'mikrotik'
+  | 'cisco'
   | 'pf'
   | 'ipset'
-  | 'htaccess' 
-  | 'iptables' 
-  | 'json' 
-  | 'csv' 
+  | 'htaccess'
+  | 'iptables'
+  | 'json'
+  | 'csv'
   | 'txt';
 
 export type IpVersionOption = 'any' | 'ipv4' | 'ipv6';

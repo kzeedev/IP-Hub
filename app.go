@@ -119,9 +119,6 @@ func init() {
 	app.Use("/assets", cache.New(cache.Config{
 		Expiration: 7 * (24 * time.Hour),
 	}))
-	app.Use("/img", cache.New(cache.Config{
-		Expiration: 7 * (24 * time.Hour),
-	}))
 
 	// Configure compression
 	app.Use(compress.New(compress.Config{
@@ -138,7 +135,6 @@ func init() {
 	app.Use("/", static.New("./web/dist"))
 	app.Use("/public", static.New("./web/public"))
 	app.Use("/assets", static.New("./web/dist/assets"))
-	app.Use("/img", static.New("./web/dist/img"))
 
 	// Route non-API GET requests to SPA index.html
 	app.Get("*", func(c fiber.Ctx) error {
