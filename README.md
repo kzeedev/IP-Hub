@@ -18,7 +18,7 @@ A self-hosted, open-source network intelligence platform powered by **RIPE NCC**
 
 <br/>
 
-<img src="web/public/img/logo.webp" alt="IP-Hub Logo" width="128" />
+<img src="web/public/assets/img/logo.webp" alt="IP-Hub Logo" width="128" />
 
 <br/>
 
