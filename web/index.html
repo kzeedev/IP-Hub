@@ -43,6 +43,28 @@
   <meta name="twitter:image" content="/assets/img/logo.webp" />
 
   <link rel="canonical" href="https://ip-hub.ir/" />
+
+  <!-- Immediate Soft-404 Detection to prevent search engine indexing -->
+  <script>
+    (function () {
+      try {
+        var p = window.location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+        var s = p ? p.split('/') : [];
+        if (s.length > 0 && (s[0] === 'fa' || s[0] === 'en')) {
+          s.shift();
+        }
+        var valid = ['country', 'countries', 'country-ips', 'batch', 'batch-inspector', 'subnet-calc', 'subnet', 'calculator', 'source', 'about', 'issues', 'bugs', 'lookup', 'ip', 'asn', 'prefix'];
+        if (s.length > 0 && valid.indexOf(s[0]) === -1) {
+          var robots = document.querySelector('meta[name="robots"]');
+          if (robots) robots.setAttribute('content', 'noindex, nofollow, noarchive');
+          var canonical = document.querySelector('link[rel="canonical"]');
+          if (canonical) canonical.remove();
+          var alts = document.querySelectorAll('link[rel="alternate"][hreflang]');
+          for (var i = 0; i < alts.length; i++) alts[i].remove();
+        }
+      } catch (e) {}
+    })();
+  </script>
   <link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32" />
   <link rel="icon" type="image/png" href="/favicon-16x16.png" sizes="16x16" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />

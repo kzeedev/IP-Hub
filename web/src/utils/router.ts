@@ -217,6 +217,13 @@ export function updateDocumentSeoMeta(
 
   document.title = title;
 
+  let robotsMeta = document.querySelector('meta[name="robots"]');
+  if (!robotsMeta) {
+    robotsMeta = document.createElement('meta');
+    robotsMeta.setAttribute('name', 'robots');
+    document.head.appendChild(robotsMeta);
+  }
+
   const metaDesc = document.querySelector('meta[name="description"]');
   if (metaDesc) {
     metaDesc.setAttribute('content', desc);
@@ -232,6 +239,17 @@ export function updateDocumentSeoMeta(
     ogDesc.setAttribute('content', desc);
   }
 
+  if (view === 'not-found') {
+    // Prevent search engines from indexing soft-404 / not-found URLs
+    robotsMeta.setAttribute('content', 'noindex, nofollow, noarchive');
+    removeHeadLinks('canonical');
+    removeHeadLinks('alternate', 'hreflang');
+    return;
+  }
+
+  // Restore robots indexing for valid routes
+  robotsMeta.setAttribute('content', 'follow, index, max-snippet:-1, max-video-preview:-1, max-image-preview:large');
+
   // Canonical and Hreflang alternate link tags
   const origin = window.location.origin;
   const currentPath = getRouteUrl(view, { query: opts.query, countryCode: opts.countryCode, lang });
@@ -242,6 +260,15 @@ export function updateDocumentSeoMeta(
   setOrUpdateHeadLink('alternate', `${origin}${enPath}`, { hreflang: 'en' });
   setOrUpdateHeadLink('alternate', `${origin}${faPath}`, { hreflang: 'fa' });
   setOrUpdateHeadLink('alternate', `${origin}${enPath}`, { hreflang: 'x-default' });
+}
+
+function removeHeadLinks(rel: string, attributeName?: string) {
+  let selector = `link[rel="${rel}"]`;
+  if (attributeName) {
+    selector += `[${attributeName}]`;
+  }
+  const links = document.querySelectorAll(selector);
+  links.forEach((link) => link.remove());
 }
 
 function setOrUpdateHeadLink(rel: string, href: string, attributes: Record<string, string> = {}) {
