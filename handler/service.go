@@ -15,6 +15,7 @@ import (
 
 	"github.com/kzeedev/IP-Hub/database"
 	"github.com/kzeedev/IP-Hub/models"
+	"github.com/kzeedev/IP-Hub/pluginBase"
 	country "github.com/mikekonan/go-countries"
 )
 
@@ -34,6 +35,8 @@ type ASNLookupService interface {
 type CountryResourceService interface {
 	LookupCountry(code string) (*models.CountryIpResource, error)
 	ResolveOrgs(asns []interface{}, prefixes []string) map[string]string
+	FormatCountry(resource *models.CountryIpResource, format, version, access, listName string) *models.FormatResult
+	GetAvailablePlugins() []models.PluginInfo
 }
 
 // SubnetCalculatorService defines subnet and CIDR breakdown operations.
@@ -939,6 +942,127 @@ func (s *whoisService) LookupCountry(code string) (*models.CountryIpResource, er
 	go s.startBackgroundCountryIspResolution(code, asns, ripeStatRes.Data.Resources.Ipv4, ripeStatRes.Data.Resources.Ipv6)
 
 	return &result, nil
+}
+
+var (
+	pluginMu sync.RWMutex
+	plugins  []pluginBase.Plugin
+)
+
+// SetPlugins sets the active plugins slice.
+func SetPlugins(p []pluginBase.Plugin) {
+	pluginMu.Lock()
+	defer pluginMu.Unlock()
+	plugins = p
+}
+
+// GetPlugins returns the active plugins slice.
+func GetPlugins() []pluginBase.Plugin {
+	pluginMu.RLock()
+	defer pluginMu.RUnlock()
+	return plugins
+}
+
+// GetAvailablePlugins returns the list of active formatting plugins and built-in formats.
+func (s *whoisService) GetAvailablePlugins() []models.PluginInfo {
+	pluginMu.RLock()
+	defer pluginMu.RUnlock()
+
+	result := make([]models.PluginInfo, 0, len(plugins)+2)
+	for _, p := range plugins {
+		result = append(result, models.PluginInfo{
+			ID:   p.GetID(),
+			Name: p.GetName(),
+		})
+	}
+
+	result = append(result,
+		models.PluginInfo{ID: "json", Name: "JSON Data"},
+		models.PluginInfo{ID: "htaccess", Name: "Apache .htaccess"},
+	)
+
+	return result
+}
+
+// FormatCountry generates formatted firewall rules or network configuration scripts using plugins.
+func (s *whoisService) FormatCountry(resource *models.CountryIpResource, format, version, access, listName string) *models.FormatResult {
+	if resource == nil {
+		return nil
+	}
+
+	cleanFormat := strings.ToLower(strings.TrimSpace(format))
+	ipVer := pluginBase.Any
+	switch strings.ToLower(strings.TrimSpace(version)) {
+	case "ipv4":
+		ipVer = pluginBase.IPv4
+	case "ipv6":
+		ipVer = pluginBase.IPv6
+	}
+
+	isAllow := strings.ToLower(strings.TrimSpace(access)) == "allow"
+
+	asnStrs := make([]string, len(resource.ASNs))
+	for i, a := range resource.ASNs {
+		asnStrs[i] = fmt.Sprintf("%d", a)
+	}
+
+	lookup := pluginBase.Lookup{
+		CountryCode: resource.CountryCode,
+		CountryName: resource.CountryName,
+		ASN:         asnStrs,
+		IPv4:        resource.IPv4,
+		IPv6:        resource.IPv6,
+		UpdatedAt:   resource.QueryTime,
+	}
+
+	switch cleanFormat {
+	case "json":
+		b, _ := json.MarshalIndent(lookup, "", "  ")
+		return &models.FormatResult{
+			Text:      string(b),
+			Filename:  fmt.Sprintf("%s.json", strings.ToLower(resource.CountryCode)),
+			RuleCount: len(resource.IPv4) + len(resource.IPv6),
+		}
+	case "htaccess":
+		acc := "Deny"
+		if isAllow {
+			acc = "Allow"
+		}
+		var text string
+		switch ipVer {
+		case pluginBase.IPv4:
+			text = fmt.Sprintf("%s from %v", acc, strings.Join(lookup.IPv4, " "))
+		case pluginBase.IPv6:
+			text = fmt.Sprintf("%s from %v", acc, strings.Join(lookup.IPv6, " "))
+		default:
+			text = fmt.Sprintf("%s from %v\n%s from %v", acc, strings.Join(lookup.IPv4, " "), acc, strings.Join(lookup.IPv6, " "))
+		}
+		return &models.FormatResult{
+			Text:      text,
+			Filename:  fmt.Sprintf(".htaccess_%s", strings.ToLower(resource.CountryCode)),
+			RuleCount: len(resource.IPv4) + len(resource.IPv6),
+		}
+	default:
+		pluginMu.RLock()
+		defer pluginMu.RUnlock()
+		for _, p := range plugins {
+			pID := strings.ToLower(p.GetID())
+			if pID == cleanFormat || (cleanFormat == "pf" && pID == "freebsd-pf") {
+				text := p.Format(lookup, ipVer, isAllow)
+				return &models.FormatResult{
+					Text:      text,
+					Filename:  fmt.Sprintf("%s_%s.txt", strings.ToLower(resource.CountryCode), cleanFormat),
+					RuleCount: len(resource.IPv4) + len(resource.IPv6),
+				}
+			}
+		}
+	}
+
+	return &models.FormatResult{
+		Text:      fmt.Sprintf("# No plugin found for format: %s", format),
+		Filename:  fmt.Sprintf("%s_%s.txt", strings.ToLower(resource.CountryCode), format),
+		RuleCount: 0,
+	}
 }
 
 func (s *whoisService) startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []string, ipv6 []string) {

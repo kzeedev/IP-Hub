@@ -19,19 +19,25 @@ export type ActiveTab =
 
 export type Language = 'en' | 'fa';
 
-export type ExportFormat =
-  | 'mikrotik'
-  | 'cisco'
-  | 'pf'
-  | 'ipset'
-  | 'htaccess'
-  | 'iptables'
-  | 'json'
-  | 'csv'
-  | 'txt';
+export type ExportFormat = string;
+
+export interface PluginFormat {
+  id: string;
+  name: string;
+}
+
+export interface SystemPluginsResponse {
+  plugins: PluginFormat[];
+}
 
 export type IpVersionOption = 'any' | 'ipv4' | 'ipv6';
 export type AccessTypeOption = 'allow' | 'deny';
+
+export interface FormatResult {
+  text: string;
+  filename: string;
+  ruleCount: number;
+}
 
 export interface RipeAttribute {
   name: string;

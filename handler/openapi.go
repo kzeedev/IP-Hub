@@ -50,14 +50,29 @@ type WhoisMyIpOutput struct {
 // WhoisCountryInput represents input for querying country IP blocks and ASNs
 type WhoisCountryInput struct {
 	Body struct {
-		Code string `json:"code" doc:"Two-letter ISO 3166-1 alpha-2 country code (e.g. US, DE, IR, GB)" example:"IR"`
+		Code     string `json:"code" doc:"Two-letter ISO 3166-1 alpha-2 country code (e.g. US, DE, IR, GB)" example:"IR"`
+		Format   string `json:"format,omitempty" doc:"Firewall/Export format (mikrotik, cisco, pf, ipset, htaccess, iptables, json, csv, txt)" example:"mikrotik"`
+		Version  string `json:"version,omitempty" doc:"IP version filter (any, ipv4, ipv6)" example:"any"`
+		Access   string `json:"access,omitempty" doc:"Access policy (allow, deny)" example:"allow"`
+		ListName string `json:"listName,omitempty" doc:"Custom address list or ACL name" example:"IR"`
 	}
 }
 
 // WhoisCountryOutput represents allocated prefixes and ASNs for a country
 type WhoisCountryOutput struct {
 	Body struct {
-		Data *models.CountryIpResource `json:"data" doc:"Country IP prefixes, ASNs, and statistics"`
+		Data   *models.CountryIpResource `json:"data" doc:"Country IP prefixes, ASNs, and statistics"`
+		Result *models.FormatResult      `json:"result,omitempty" doc:"Formatted firewall rules or export result"`
+	}
+}
+
+// SystemPluginsInput represents input for listing available formatting plugins
+type SystemPluginsInput struct{}
+
+// SystemPluginsOutput represents the list of available plugins
+type SystemPluginsOutput struct {
+	Body struct {
+		Plugins []models.PluginInfo `json:"plugins" doc:"List of available formatting plugins"`
 	}
 }
 
@@ -235,13 +250,50 @@ func (h *Handler) SetupOpenAPI(app *fiber.App) huma.API {
 			return nil, huma.Error400BadRequest("Country code must be a 2-letter ISO 3166-1 alpha-2 code (e.g. US, DE, IR)")
 		}
 
+		format := strings.ToLower(strings.TrimSpace(input.Body.Format))
+		if format == "" {
+			return nil, huma.Error400BadRequest("Format is required and cannot be empty")
+		}
+
+		version := strings.ToLower(strings.TrimSpace(input.Body.Version))
+		if version == "" {
+			return nil, huma.Error400BadRequest("IP version is required and cannot be empty (e.g. any, ipv4, ipv6)")
+		}
+
+		access := strings.ToLower(strings.TrimSpace(input.Body.Access))
+		if access == "" {
+			return nil, huma.Error400BadRequest("Access policy is required and cannot be empty (e.g. allow, deny)")
+		}
+
+		listName := strings.TrimSpace(input.Body.ListName)
+		if listName == "" {
+			return nil, huma.Error400BadRequest("List name is required and cannot be empty")
+		}
+
 		res, err := h.svc.LookupCountry(code)
 		if err != nil {
 			return nil, huma.Error500InternalServerError(err.Error())
 		}
 
+		result := h.svc.FormatCountry(res, format, version, access, listName)
+
 		resp := &WhoisCountryOutput{}
 		resp.Body.Data = res
+		resp.Body.Result = result
+		return resp, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "system-plugins",
+		Method:      http.MethodGet,
+		Path:        "/api/system/plugins",
+		Summary:     "List Available Formatting Plugins",
+		Description: "Returns the list of loaded formatting plugins and built-in formats (e.g. mikrotik, cisco, json, htaccess) available in the system.",
+		Tags:        []string{"System"},
+	}, func(ctx context.Context, input *SystemPluginsInput) (*SystemPluginsOutput, error) {
+		pluginsList := h.svc.GetAvailablePlugins()
+		resp := &SystemPluginsOutput{}
+		resp.Body.Plugins = pluginsList
 		return resp, nil
 	})
 

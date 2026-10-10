@@ -2,6 +2,7 @@ package test
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/kzeedev/IP-Hub/handler"
 	"github.com/kzeedev/IP-Hub/models"
+	"github.com/kzeedev/IP-Hub/pluginBase"
 )
 
 // MockWhoisService implements handler.WhoisService for testing.
@@ -23,6 +25,8 @@ type MockWhoisService struct {
 	ResolveOrgsFunc     func(asns []interface{}, prefixes []string) map[string]string
 	ComputeSubnetFunc   func(input string, customCidr *int) *models.SubnetBreakdown
 	BatchLookupFunc     func(items []string) []models.BatchItemResult
+	FormatCountryFunc       func(resource *models.CountryIpResource, format, version, access, listName string) *models.FormatResult
+	GetAvailablePluginsFunc func() []models.PluginInfo
 }
 
 func (m *MockWhoisService) LookupIP(query string) (*models.WhoisRecord, error) {
@@ -83,6 +87,28 @@ func (m *MockWhoisService) BatchLookup(items []string) []models.BatchItemResult 
 		res[i] = models.BatchItemResult{Query: item, Status: "success"}
 	}
 	return res
+}
+
+func (m *MockWhoisService) FormatCountry(resource *models.CountryIpResource, format, version, access, listName string) *models.FormatResult {
+	if m.FormatCountryFunc != nil {
+		return m.FormatCountryFunc(resource, format, version, access, listName)
+	}
+	return &models.FormatResult{
+		Text:      "mock formatted text",
+		Filename:  "mock.txt",
+		RuleCount: 10,
+	}
+}
+
+func (m *MockWhoisService) GetAvailablePlugins() []models.PluginInfo {
+	if m.GetAvailablePluginsFunc != nil {
+		return m.GetAvailablePluginsFunc()
+	}
+	return []models.PluginInfo{
+		{ID: "mikrotik", Name: "Mikrotik address-list"},
+		{ID: "json", Name: "JSON Data"},
+		{ID: "htaccess", Name: "Apache .htaccess"},
+	}
 }
 
 func TestNewHandlerDependencyInjection(t *testing.T) {
@@ -236,5 +262,199 @@ func TestOpenAPIRoutes(t *testing.T) {
 	}
 	if subnetResult.Data == nil || subnetResult.Data.NetworkAddress != "192.168.1.0" {
 		t.Errorf("Expected network address 192.168.1.0, got %+v", subnetResult.Data)
+	}
+}
+
+func TestServerSidePlugins(t *testing.T) {
+	app := fiber.New()
+	mockSvc := &MockWhoisService{}
+	h := handler.New(mockSvc)
+	h.SetupOpenAPI(app)
+
+	// Test Country query with complete format parameters
+	reqCountry := httptest.NewRequest(http.MethodPost, "/api/whois/country", strings.NewReader(`{"code":"IR","format":"mikrotik","version":"any","access":"allow","listName":"IR"}`))
+	reqCountry.Header.Set("Content-Type", "application/json")
+	respCountry, err := app.Test(reqCountry)
+	if err != nil {
+		t.Fatalf("Country request failed: %v", err)
+	}
+	if respCountry.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", respCountry.StatusCode)
+	}
+
+	var countryRes struct {
+		Data   *models.CountryIpResource `json:"data"`
+		Result *models.FormatResult      `json:"result"`
+	}
+	bodyCountry, _ := io.ReadAll(respCountry.Body)
+	if err := json.Unmarshal(bodyCountry, &countryRes); err != nil {
+		t.Fatalf("Failed to parse country response JSON: %v", err)
+	}
+	if countryRes.Data == nil || countryRes.Data.CountryCode != "IR" {
+		t.Errorf("Expected country data for IR, got %+v", countryRes.Data)
+	}
+	if countryRes.Result == nil || countryRes.Result.Text == "" {
+		t.Errorf("Expected non-empty formatted result from server, got %+v", countryRes.Result)
+	}
+
+	// Test Country endpoint with custom format options
+	reqFormat := httptest.NewRequest(http.MethodPost, "/api/whois/country", strings.NewReader(`{"code":"IR","format":"cisco","version":"ipv4","access":"deny","listName":"IR_BLOCK"}`))
+	reqFormat.Header.Set("Content-Type", "application/json")
+	respFormat, err := app.Test(reqFormat)
+	if err != nil {
+		t.Fatalf("Format request failed: %v", err)
+	}
+	if respFormat.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", respFormat.StatusCode)
+	}
+
+	var formatRes struct {
+		Data   *models.CountryIpResource `json:"data"`
+		Result *models.FormatResult      `json:"result"`
+	}
+	bodyFormat, _ := io.ReadAll(respFormat.Body)
+	if err := json.Unmarshal(bodyFormat, &formatRes); err != nil {
+		t.Fatalf("Failed to parse format response JSON: %v", err)
+	}
+	if formatRes.Result == nil || formatRes.Result.Text == "" {
+		t.Errorf("Expected non-empty format result, got %+v", formatRes.Result)
+	}
+
+	// Test validation: empty fields should return 400 Bad Request
+	invalidBodies := []string{
+		`{"code":"","format":"mikrotik","version":"any","access":"allow","listName":"IR"}`,
+		`{"code":"IR","format":"","version":"any","access":"allow","listName":"IR"}`,
+		`{"code":"IR","format":"mikrotik","version":"","access":"allow","listName":"IR"}`,
+		`{"code":"IR","format":"mikrotik","version":"any","access":"","listName":"IR"}`,
+		`{"code":"IR","format":"mikrotik","version":"any","access":"allow","listName":""}`,
+		`{"code":"IR"}`,
+	}
+	for _, body := range invalidBodies {
+		reqInv := httptest.NewRequest(http.MethodPost, "/api/whois/country", strings.NewReader(body))
+		reqInv.Header.Set("Content-Type", "application/json")
+		respInv, err := app.Test(reqInv)
+		if err != nil {
+			t.Fatalf("Request failed: %v", err)
+		}
+		if respInv.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400 for body %s, got %d", body, respInv.StatusCode)
+		}
+	}
+}
+
+type mockPlugin struct {
+	*pluginBase.BasePlugin
+}
+
+func newMockPlugin(id, name string) *mockPlugin {
+	return &mockPlugin{
+		BasePlugin: pluginBase.NewBasePlugin(id, name),
+	}
+}
+
+func (m *mockPlugin) Format(data pluginBase.Lookup, ipVersion pluginBase.IPVersion, access bool) string {
+	return fmt.Sprintf("rules for %s format=%s version=%s access=%v", data.CountryCode, m.GetID(), ipVersion, access)
+}
+
+func TestBuiltinPluginFormatting(t *testing.T) {
+	handler.SetPlugins([]pluginBase.Plugin{
+		newMockPlugin("mikrotik", "Mikrotik"),
+		newMockPlugin("cisco", "Cisco"),
+		newMockPlugin("freebsd-pf", "FreeBSD PF"),
+		newMockPlugin("ipset", "Linux IPSet"),
+	})
+
+	svc := handler.NewWhoisService()
+	res := &models.CountryIpResource{
+		CountryCode: "IR",
+		CountryName: "Iran",
+		IPv4:        []string{"5.10.128.0/17", "37.152.160.0/19"},
+		IPv6:        []string{"2a01:5ec0::/32"},
+		QueryTime:   "2026-10-10 10:00:00",
+	}
+
+	formats := []struct {
+		format      string
+		expectedSub string
+	}{
+		{"mikrotik", "rules for IR format=mikrotik"},
+		{"cisco", "rules for IR format=cisco"},
+		{"pf", "rules for IR format=freebsd-pf"},
+		{"freebsd-pf", "rules for IR format=freebsd-pf"},
+		{"ipset", "rules for IR format=ipset"},
+		{"htaccess", "Allow from 5.10.128.0/17"},
+		{"json", `"CountryCode": "IR"`},
+	}
+
+	for _, tc := range formats {
+		out := svc.FormatCountry(res, tc.format, "any", "allow", "")
+		if out == nil {
+			t.Fatalf("Format %s returned nil", tc.format)
+		}
+		if out.RuleCount != 3 {
+			t.Errorf("Format %s: expected rule count 3, got %d", tc.format, out.RuleCount)
+		}
+		if !strings.Contains(out.Text, tc.expectedSub) {
+			t.Errorf("Format %s: expected output containing %q, got: %s", tc.format, tc.expectedSub, out.Text)
+		}
+	}
+}
+
+func TestPluginsEndpoint(t *testing.T) {
+	app := fiber.New()
+	mockSvc := &MockWhoisService{}
+	h := handler.New(mockSvc)
+	h.SetupOpenAPI(app)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/system/plugins", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("Plugins request failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	var res struct {
+		Plugins []models.PluginInfo `json:"plugins"`
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if err := json.Unmarshal(body, &res); err != nil {
+		t.Fatalf("Failed to parse plugins response JSON: %v", err)
+	}
+	if len(res.Plugins) != 3 {
+		t.Errorf("Expected 3 plugins, got %d", len(res.Plugins))
+	}
+	if res.Plugins[0].ID != "mikrotik" {
+		t.Errorf("Expected first plugin ID mikrotik, got %s", res.Plugins[0].ID)
+	}
+}
+
+func TestGetAvailablePluginsRealService(t *testing.T) {
+	handler.SetPlugins([]pluginBase.Plugin{
+		newMockPlugin("mikrotik", "Mikrotik address-list"),
+		newMockPlugin("cisco", "Cisco access-list"),
+	})
+
+	svc := handler.NewWhoisService()
+	pluginsList := svc.GetAvailablePlugins()
+
+	// Should contain loaded plugins + built-ins (json, htaccess)
+	if len(pluginsList) != 4 {
+		t.Errorf("Expected 4 plugins, got %d: %+v", len(pluginsList), pluginsList)
+	}
+
+	hasJSON := false
+	hasHtaccess := false
+	for _, p := range pluginsList {
+		if p.ID == "json" {
+			hasJSON = true
+		}
+		if p.ID == "htaccess" {
+			hasHtaccess = true
+		}
+	}
+	if !hasJSON || !hasHtaccess {
+		t.Errorf("Expected json and htaccess in available plugins, got %+v", pluginsList)
 	}
 }

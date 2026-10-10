@@ -22,10 +22,9 @@ import {
   CheckCircle2,
   Filter,
 } from 'lucide-react';
-import { CountryIpResource, ExportFormat, IpVersionOption, AccessTypeOption } from '../types';
+import { CountryIpResource, ExportFormat, IpVersionOption, AccessTypeOption, FormatResult, PluginFormat } from '../types';
 import { ALL_COUNTRIES, POPULAR_COUNTRIES, getCountryDetails } from '../utils/countries';
 import { copyToClipboard, downloadText } from '../utils/helpers';
-import { generateFirewallConfig } from '../utils/formatters';
 import { getRouteUrl } from '../utils/router';
 import { useLanguage } from '../i18n/LanguageContext';
 import { FlagIcon } from './FlagIcon';
@@ -57,12 +56,53 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   const [page, setPage] = useState<number>(1);
   const itemsPerPage = 50;
 
+  // Dynamic plugins list fetched from backend
+  const [pluginsList, setPluginsList] = useState<PluginFormat[]>([]);
+  const [isLoadingPlugins, setIsLoadingPlugins] = useState<boolean>(true);
+
+  // Derived formats list from pluginsList IDs
+  const formats: string[] = useMemo(() => pluginsList.map(p => p.id), [pluginsList]);
+
   // Firewall Generator States
   const [format, setFormat] = useState<ExportFormat>('mikrotik');
   const [ipVersion, setIpVersion] = useState<IpVersionOption>('any');
   const [accessType, setAccessType] = useState<AccessTypeOption>('allow');
   const [customListName, setCustomListName] = useState<string>('');
   const [isConfigCopied, setIsConfigCopied] = useState<boolean>(false);
+
+  // Fetch available plugins from backend dynamically on mount and derive formats list
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPlugins = async () => {
+      try {
+        const res = await fetch('/api/system/plugins');
+        if (res.ok) {
+          const json = await res.json();
+          const list: PluginFormat[] = json.plugins || [];
+          if (isMounted && list.length > 0) {
+            setPluginsList(list);
+            const availableFormatIds = list.map(p => p.id);
+            setFormat(currentFormat => {
+              if (currentFormat && availableFormatIds.includes(currentFormat)) {
+                return currentFormat;
+              }
+              return availableFormatIds[0];
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load plugins:', err);
+      } finally {
+        if (isMounted) {
+          setIsLoadingPlugins(false);
+        }
+      }
+    };
+    fetchPlugins();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // ISP / Organization resolution cache
   const [resolvedOrgs, setResolvedOrgs] = useState<Record<string, string>>({});
@@ -72,17 +112,28 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   const [copiedItem, setCopiedItem] = useState<string | null>(null);
   const [isTableCopied, setIsTableCopied] = useState<boolean>(false);
 
+  // Generated firewall script from server-side plugins
+  const [generatedScript, setGeneratedScript] = useState<FormatResult>({ text: '', filename: '', ruleCount: 0 });
+
   // Fetch country data from backend
   const fetchCountryData = async (code: string) => {
     setIsLoading(true);
     setError(null);
     setPage(1);
 
+    const activeFormat = format || (formats.length > 0 ? formats[0] : 'json');
+
     try {
       const res = await fetch('/api/whois/country', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({
+          code,
+          format: activeFormat,
+          version: ipVersion,
+          access: accessType,
+          listName: customListName || code,
+        }),
       });
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
@@ -90,6 +141,9 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
       }
       const json = await res.json();
       setData(json.data);
+      if (json.result) {
+        setGeneratedScript(json.result);
+      }
       if (json.data?.asNames) {
         const orgMap: Record<string, string> = {};
         for (const [asn, name] of Object.entries(json.data.asNames as Record<string, string>)) {
@@ -115,6 +169,43 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
     }
   }, [selectedCountry]);
 
+  // Update server-side plugin formatted output when formatting options change
+  const isInitialFormatLoad = useRef(true);
+  useEffect(() => {
+    if (isInitialFormatLoad.current) {
+      isInitialFormatLoad.current = false;
+      return;
+    }
+    if (!data || !selectedCountry || !format) return;
+    const controller = new AbortController();
+
+    fetch('/api/whois/country', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: selectedCountry,
+        format,
+        version: ipVersion,
+        access: accessType,
+        listName: customListName || selectedCountry,
+      }),
+      signal: controller.signal,
+    })
+      .then(res => (res.ok ? res.json() : null))
+      .then(json => {
+        if (json?.result) {
+          setGeneratedScript(json.result);
+        }
+      })
+      .catch(err => {
+        if (err.name !== 'AbortError') {
+          // ignore
+        }
+      });
+
+    return () => controller.abort();
+  }, [format, ipVersion, accessType, customListName]);
+
   // Filter countries for dropdown with bilingual name support
   const filteredCountries = useMemo(() => {
     const q = deferredCountrySearch.toLowerCase().trim();
@@ -134,21 +225,6 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   }, [language]);
 
   const currentMeta = useMemo(() => getCountryDetails(selectedCountry, language), [selectedCountry, language]);
-
-  // Generated firewall script
-  const generatedScript = useMemo(() => {
-    if (!data) return { text: '', filename: '', ruleCount: 0 };
-    return generateFirewallConfig({
-      countryCode: data.countryCode,
-      countryName: data.countryName,
-      format,
-      version: ipVersion,
-      access: accessType,
-      listName: customListName || data.countryCode,
-      data,
-      resolvedOrgs,
-    });
-  }, [data, format, ipVersion, accessType, customListName, resolvedOrgs]);
 
   // Filtered list for table
   const filteredList = useMemo(() => {
@@ -297,7 +373,10 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   return (
     <div className="space-y-6 max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
 
-      {/* Header & Country Selector */}
+      {/* ======================================================== */}
+      {/* ======================================================== */}
+      {/* Country IP Allocations & Firewall Generator (Form Card)   */}
+      {/* ======================================================== */}
       <div className="bg-slate-850 rounded-2xl border border-slate-800 p-6 shadow-sm space-y-5">
         <div className="flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center shadow-inner shrink-0">
@@ -316,102 +395,184 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
           </div>
         </div>
 
-        {/* Dedicated Country Selector Row */}
-        <div className="pt-4 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              {t.countryExplorer.selectCountry}:
+        {/* Unified Form Controls */}
+        <form onSubmit={e => e.preventDefault()} className="space-y-4 pt-3 border-t border-slate-800/80">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+
+            {/* 1. Country Selection */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300 block">
+                {t.countryExplorer.selectCountry}
+              </label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className="w-full px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-left text-xs font-semibold text-white flex items-center justify-between gap-2 transition-colors shadow-sm h-[38px]"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <FlagIcon code={currentMeta.code} className="w-4 h-3 rounded-[2px] shrink-0" />
+                    <span className="truncate">{currentMeta.name}</span>
+                    <span className="text-[10px] text-cyan-400 font-mono">({currentMeta.code})</span>
+                  </div>
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </button>
+
+                {isDropdownOpen && (
+                  <div className={`absolute ${isRtl ? 'right-0' : 'left-0'} mt-2 w-72 sm:w-80 max-w-[90vw] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 p-3 space-y-2`}>
+                    <div className="relative">
+                      <Search className={`w-4 h-4 absolute ${isRtl ? 'right-3' : 'left-3'} top-2.5 text-slate-400`} />
+                      <input
+                        type="text"
+                        value={countrySearchQuery}
+                        onChange={e => setCountrySearchQuery(e.target.value)}
+                        placeholder={t.countryExplorer.searchCountry}
+                        className={`w-full ${isRtl ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500`}
+                        autoFocus
+                      />
+                    </div>
+
+                    <div className="max-h-64 overflow-y-auto space-y-1 divide-y divide-slate-800/40">
+                      {filteredCountries.map(c => (
+                        <a
+                          key={c.code}
+                          href={getRouteUrl('country-ips', { countryCode: c.code, lang: language })}
+                          hrefLang={language}
+                          onClick={(e) => {
+                            if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                              e.preventDefault();
+                              setSelectedCountry(c.code);
+                              setIsDropdownOpen(false);
+                              setCountrySearchQuery('');
+                            }
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${c.code === selectedCountry
+                            ? 'bg-cyan-600 text-white font-bold'
+                            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                            }`}
+                        >
+                          <div className="flex items-center gap-2.5 truncate">
+                            <FlagIcon code={c.code} className="w-4 h-3 rounded-[2px]" />
+                            <span className="truncate">{c.name}</span>
+                          </div>
+                          <span className={`text-[10px] font-mono ${c.code === selectedCountry ? 'text-cyan-100' : 'text-slate-500'}`}>
+                            {c.code}
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 2. Format Selection */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300 block">
+                {t.countryExplorer.formatLabel}
+              </label>
+              <select
+                value={format}
+                onChange={e => setFormat(e.target.value as ExportFormat)}
+                disabled={isLoadingPlugins && pluginsList.length === 0}
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-semibold h-[38px] disabled:opacity-50"
+              >
+                {pluginsList.length > 0 ? (
+                  pluginsList.map(p => {
+                    const label =
+                      (t.countryExplorer.formats as Record<string, string>)?.[p.id] ||
+                      (p.id === 'freebsd-pf' ? (t.countryExplorer.formats as Record<string, string>)?.pf : null) ||
+                      p.name ||
+                      p.id;
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {label}
+                      </option>
+                    );
+                  })
+                ) : (
+                  <option value={format}>
+                    {(t.countryExplorer.formats as Record<string, string>)?.[format] || format}
+                  </option>
+                )}
+              </select>
+            </div>
+
+            {/* 3. IP Version Selection */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300 block">
+                {t.countryExplorer.versionLabel}
+              </label>
+              <select
+                value={ipVersion}
+                onChange={e => setIpVersion(e.target.value as IpVersionOption)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-semibold h-[38px]"
+              >
+                <option value="any">{t.countryExplorer.versions.any}</option>
+                <option value="ipv4">{t.countryExplorer.versions.ipv4}</option>
+                <option value="ipv6">{t.countryExplorer.versions.ipv6}</option>
+              </select>
+            </div>
+
+            {/* 4. Access Policy Selection */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300 block">
+                {t.countryExplorer.accessLabel}
+              </label>
+              <select
+                value={accessType}
+                onChange={e => setAccessType(e.target.value as AccessTypeOption)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-semibold h-[38px]"
+              >
+                <option value="allow">{t.countryExplorer.access.allow}</option>
+                <option value="deny">{t.countryExplorer.access.deny}</option>
+              </select>
+            </div>
+
+            {/* 5. Address List / ACL Name */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300 block">
+                {t.countryExplorer.listNameLabel}
+              </label>
+              <input
+                type="text"
+                value={customListName}
+                onChange={e => setCustomListName(e.target.value)}
+                placeholder={data?.countryCode || selectedCountry}
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono font-semibold h-[38px]"
+              />
+            </div>
+
+          </div>
+
+          {/* Popular Country Chips */}
+          <div className="pt-2 flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+            <span className="text-slate-400 font-semibold text-[11px] uppercase tracking-wider shrink-0 mr-1">
+              {t.countryExplorer.topRegions}
             </span>
+            {popularCountries.map(c => (
+              <a
+                key={c.code}
+                href={getRouteUrl('country-ips', { countryCode: c.code, lang: language })}
+                hrefLang={language}
+                onClick={(e) => {
+                  if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                    e.preventDefault();
+                    setSelectedCountry(c.code);
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-xl border font-medium flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${c.code === selectedCountry
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-sm font-bold'
+                  : 'bg-slate-900/80 text-slate-300 border-slate-800 hover:bg-slate-800 hover:border-slate-700 hover:text-white'
+                  }`}
+              >
+                <FlagIcon code={c.code} className="w-4 h-3 rounded-[2px]" />
+                <span>{c.name}</span>
+                <span className="text-[10px] font-mono text-slate-500">({c.code})</span>
+              </a>
+            ))}
           </div>
-
-          <div className="relative w-full sm:w-80">
-            <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="w-full px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-left text-sm font-semibold text-white flex items-center justify-between gap-2 transition-colors shadow-sm"
-            >
-              <div className="flex items-center gap-2.5 truncate">
-                <FlagIcon code={currentMeta.code} className="w-5 h-3.5 rounded-[2px]" />
-                <span className="truncate">{currentMeta.name}</span>
-                <span className="text-xs text-cyan-400 font-mono">({currentMeta.code})</span>
-              </div>
-              <SlidersHorizontal className="w-4 h-4 text-slate-400 shrink-0" />
-            </button>
-
-            {isDropdownOpen && (
-              <div className={`absolute ${isRtl ? 'left-0' : 'right-0'} mt-2 w-full sm:w-80 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 p-3 space-y-2`}>
-                <div className="relative">
-                  <Search className={`w-4 h-4 absolute ${isRtl ? 'right-3' : 'left-3'} top-2.5 text-slate-400`} />
-                  <input
-                    type="text"
-                    value={countrySearchQuery}
-                    onChange={e => setCountrySearchQuery(e.target.value)}
-                    placeholder={t.countryExplorer.searchCountry}
-                    className={`w-full ${isRtl ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500`}
-                    autoFocus
-                  />
-                </div>
-
-                <div className="max-h-64 overflow-y-auto space-y-1 divide-y divide-slate-800/40">
-                  {filteredCountries.map(c => (
-                    <a
-                      key={c.code}
-                      href={getRouteUrl('country-ips', { countryCode: c.code, lang: language })}
-                      hrefLang={language}
-                      onClick={(e) => {
-                        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
-                          e.preventDefault();
-                          setSelectedCountry(c.code);
-                          setIsDropdownOpen(false);
-                          setCountrySearchQuery('');
-                        }
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${c.code === selectedCountry
-                        ? 'bg-cyan-600 text-white font-bold'
-                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                        }`}
-                    >
-                      <div className="flex items-center gap-2.5 truncate">
-                        <FlagIcon code={c.code} className="w-4 h-3 rounded-[2px]" />
-                        <span className="truncate">{c.name}</span>
-                      </div>
-                      <span className={`text-[10px] font-mono ${c.code === selectedCountry ? 'text-cyan-100' : 'text-slate-500'}`}>
-                        {c.code}
-                      </span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Popular Country Chips */}
-        <div className="mt-5 pt-4 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-          <span className="text-slate-400 font-semibold text-[11px] uppercase tracking-wider shrink-0 mr-1">
-            {t.countryExplorer.topRegions}
-          </span>
-          {popularCountries.map(c => (
-            <a
-              key={c.code}
-              href={getRouteUrl('country-ips', { countryCode: c.code, lang: language })}
-              hrefLang={language}
-              onClick={(e) => {
-                if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
-                  e.preventDefault();
-                  setSelectedCountry(c.code);
-                }
-              }}
-              className={`px-3 py-1.5 rounded-xl border font-medium flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${c.code === selectedCountry
-                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-sm font-bold'
-                : 'bg-slate-900/80 text-slate-300 border-slate-800 hover:bg-slate-800 hover:border-slate-700 hover:text-white'
-                }`}
-            >
-              <FlagIcon code={c.code} className="w-4 h-3 rounded-[2px]" />
-              <span>{c.name}</span>
-              <span className="text-[10px] font-mono text-slate-500">({c.code})</span>
-            </a>
-          ))}
-        </div>
+        </form>
       </div>
 
       {/* Metrics Banner */}
@@ -508,23 +669,27 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
       )}
 
       {/* ======================================================== */}
-      {/* 🚀 CORE FEATURE: Integrated Firewall & Format Generator  */}
+      {/* Configuration Result Card                                */}
       {/* ======================================================== */}
-      {data && !isLoading && (
-        <div className="bg-slate-850 rounded-2xl border border-cyan-500/30 p-6 shadow-xl space-y-5">
-
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+      {generatedScript.text && (
+        <div className="bg-slate-850 rounded-2xl border border-slate-800 p-6 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/30">
-                <ShieldCheck className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center shrink-0">
+                <Code2 className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <span>{t.countryExplorer.firewallGenerator}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono">
-                    {currentMeta.name} ({currentMeta.code})
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                    {t.countryExplorer.previewRules}
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-xs font-mono font-semibold">
+                    {generatedScript.ruleCount.toLocaleString()} {t.countryExplorer.rulesGenerated}
                   </span>
-                </h2>
+                  <span className="px-2 py-0.5 rounded-md bg-slate-900 text-slate-300 border border-slate-700/80 text-xs font-mono">
+                    {generatedScript.filename}
+                  </span>
+                </div>
                 <p className="text-xs text-slate-400 mt-0.5">
                   {t.countryExplorer.generatorDesc}
                 </p>
@@ -532,10 +697,11 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
             </div>
 
             {/* Actions: Copy & Download */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
               <button
+                type="button"
                 onClick={handleCopyGenerated}
-                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-cyan-600/30 active:scale-95"
+                className="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-cyan-600/30 active:scale-95"
               >
                 {isConfigCopied ? (
                   <>
@@ -551,8 +717,9 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
               </button>
 
               <button
+                type="button"
                 onClick={handleDownloadGenerated}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
               >
                 <Download className="w-4 h-4 text-emerald-400" />
                 <span>{t.countryExplorer.downloadScript}</span>
@@ -560,97 +727,14 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
             </div>
           </div>
 
-          {/* Controls: Formats, Version, Access Type, List Name */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
-
-            {/* Format Selection */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 block">
-                {t.countryExplorer.formatLabel}
-              </label>
-              <select
-                value={format}
-                onChange={e => setFormat(e.target.value as ExportFormat)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-semibold"
-              >
-                <option value="mikrotik">{t.countryExplorer.formats.mikrotik}</option>
-                <option value="cisco">{t.countryExplorer.formats.cisco}</option>
-                <option value="pf">{t.countryExplorer.formats.pf}</option>
-                <option value="ipset">{t.countryExplorer.formats.ipset}</option>
-                <option value="htaccess">{t.countryExplorer.formats.htaccess}</option>
-                <option value="iptables">{t.countryExplorer.formats.iptables}</option>
-                <option value="json">{t.countryExplorer.formats.json}</option>
-                <option value="csv">{t.countryExplorer.formats.csv}</option>
-                <option value="txt">{t.countryExplorer.formats.txt}</option>
-              </select>
-            </div>
-
-            {/* IP Version Selection */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 block">
-                {t.countryExplorer.versionLabel}
-              </label>
-              <select
-                value={ipVersion}
-                onChange={e => setIpVersion(e.target.value as IpVersionOption)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-semibold"
-              >
-                <option value="any">{t.countryExplorer.versions.any}</option>
-                <option value="ipv4">{t.countryExplorer.versions.ipv4}</option>
-                <option value="ipv6">{t.countryExplorer.versions.ipv6}</option>
-              </select>
-            </div>
-
-            {/* Access Policy Selection */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 block">
-                {t.countryExplorer.accessLabel}
-              </label>
-              <select
-                value={accessType}
-                onChange={e => setAccessType(e.target.value as AccessTypeOption)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-semibold"
-              >
-                <option value="allow">{t.countryExplorer.access.allow}</option>
-                <option value="deny">{t.countryExplorer.access.deny}</option>
-              </select>
-            </div>
-
-            {/* Address List / ACL Name */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 block">
-                {t.countryExplorer.listNameLabel}
-              </label>
-              <input
-                type="text"
-                value={customListName}
-                onChange={e => setCustomListName(e.target.value)}
-                placeholder={data.countryCode}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono font-semibold"
-              />
-            </div>
-
+          {/* Syntax Preview Code Box */}
+          <div className="relative rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs text-slate-200 overflow-x-auto max-h-72 overflow-y-auto leading-relaxed selection:bg-cyan-500/40">
+            <pre className="whitespace-pre">{generatedScript.text}</pre>
           </div>
-
-          {/* Code Preview Block */}
-          <div className="space-y-2 pt-2">
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <div className="flex items-center gap-2">
-                <Code2 className="w-4 h-4 text-cyan-400" />
-                <span className="font-semibold text-slate-300">{t.countryExplorer.previewRules}</span>
-                <span className="font-mono text-cyan-400">({generatedScript.ruleCount.toLocaleString()} {t.countryExplorer.rulesGenerated})</span>
-              </div>
-              <span className="font-mono text-[11px] text-slate-500">{generatedScript.filename}</span>
-            </div>
-
-            <div className="relative rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs text-slate-200 overflow-x-auto max-h-60 overflow-y-auto leading-relaxed selection:bg-cyan-500/40">
-              <pre className="whitespace-pre">{generatedScript.text}</pre>
-            </div>
-          </div>
-
-
         </div>
       )}
+
+
 
       {/* Prefix Table & Explorer */}
       {data && !isLoading && (

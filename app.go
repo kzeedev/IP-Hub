@@ -40,6 +40,7 @@ func init() {
 	}
 
 	loadPlugins()
+	handler.SetPlugins(plugins)
 
 	// Initialize Redis client
 	isTest := strings.HasSuffix(os.Args[0], ".test") || strings.HasSuffix(os.Args[0], ".test.exe")

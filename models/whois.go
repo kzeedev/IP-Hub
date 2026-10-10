@@ -138,6 +138,17 @@ type CountryIpResource struct {
 	Cached                      bool              `json:"cached"`
 }
 
+type FormatResult struct {
+	Text      string `json:"text"`
+	Filename  string `json:"filename"`
+	RuleCount int    `json:"ruleCount"`
+}
+
+type PluginInfo struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type BatchItemResult struct {
 	Query       string `json:"query"`
 	Status      string `json:"status"`
