@@ -1,8 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { Card, Descriptions, Tag, Typography, Row, Col, Space, Button, theme } from 'antd';
+import {
+  ClusterOutlined,
+  BankOutlined,
+  UserOutlined,
+  ClockCircleOutlined,
+} from '@ant-design/icons';
 import { WhoisRecord } from '../types';
-import { formatDate, copyToClipboard } from '../utils/helpers';
-import { Network, Server, Clock, User, Building, Copy, Check } from 'lucide-react';
+import { formatDate } from '../utils/helpers';
 import { useLanguage } from '../i18n/LanguageContext';
+
+const { Text, Paragraph } = Typography;
 
 interface OverviewTabProps {
   record: WhoisRecord;
@@ -11,233 +19,226 @@ interface OverviewTabProps {
 
 export const OverviewTab: React.FC<OverviewTabProps> = ({ record, onSearchResource }) => {
   const { t } = useLanguage();
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const { token } = theme.useToken();
 
-  const handleCopy = (key: string, val: string) => {
-    copyToClipboard(val);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
-  };
+  const networkItems = [
+    {
+      key: 'netname',
+      label: t.overviewTab.netnameLabel,
+      children: (
+        <Text strong copyable={{ text: record.netname }} style={{ fontFamily: 'monospace' }}>
+          {record.netname}
+        </Text>
+      ),
+    },
+    {
+      key: 'range',
+      label: t.overviewTab.ipRangeLabel,
+      children: (
+        <Text copyable={{ text: record.range }} style={{ fontFamily: 'monospace' }}>
+          {record.range}
+        </Text>
+      ),
+    },
+    {
+      key: 'cidr',
+      label: t.overviewTab.cidrLabel,
+      children: (
+        <Text strong copyable={{ text: record.cidr }} style={{ fontFamily: 'monospace', color: token.colorPrimary }}>
+          {record.cidr}
+        </Text>
+      ),
+    },
+    {
+      key: 'status',
+      label: t.overviewTab.statusLabel,
+      children: (
+        <Tag color="processing" variant="filled">
+          {record.status}
+        </Tag>
+      ),
+    },
+    {
+      key: 'rdns',
+      label: t.overviewTab.reverseDns,
+      children: record.reverseDns ? (
+        <Text copyable={{ text: record.reverseDns }} style={{ fontFamily: 'monospace' }}>
+          {record.reverseDns}
+        </Text>
+      ) : (
+        <Text type="secondary" italic>
+          {t.overviewTab.noReverseDns}
+        </Text>
+      ),
+    },
+    {
+      key: 'source',
+      label: t.overviewTab.rirSource,
+      children: <Tag color="default">{record.source}</Tag>,
+    },
+  ];
 
   return (
-    <div className="space-y-6">
-      
-      {/* Network Overview Grid */}
-      <div className="bg-slate-850 rounded-2xl border border-slate-800 p-6">
-        <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-          <Network className="w-4 h-4 text-cyan-400" />
-          {t.overviewTab.allocationTitle}
-        </h3>
+    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+      {/* Network Overview Card */}
+      <Card
+        title={
+          <Space orientation="horizontal" size={8}>
+            <ClusterOutlined style={{ color: token.colorPrimary }} />
+            <span>{t.overviewTab.allocationTitle}</span>
+          </Space>
+        }
+      >
+        <Descriptions
+          bordered
+          size="middle"
+          column={{ xs: 1, sm: 1, md: 2, lg: 2, xl: 3, xxl: 3 }}
+          items={networkItems}
+        />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
-          
-          <div className="flex flex-col gap-1 pb-3 border-b border-slate-800">
-            <span className="text-xs text-slate-400 font-medium">{t.overviewTab.netnameLabel}</span>
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-sm font-bold text-cyan-300">{record.netname}</span>
-              <button
-                onClick={() => handleCopy('netname', record.netname)}
-                className="text-slate-500 hover:text-slate-200"
-                title="Copy"
-              >
-                {copiedKey === 'netname' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1 pb-3 border-b border-slate-800">
-            <span className="text-xs text-slate-400 font-medium">{t.overviewTab.ipRangeLabel}</span>
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-sm text-slate-200 font-semibold">{record.range}</span>
-              <button
-                onClick={() => handleCopy('range', record.range)}
-                className="text-slate-500 hover:text-slate-200"
-                title={t.common.copy}
-              >
-                {copiedKey === 'range' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1 pb-3 border-b border-slate-800">
-            <span className="text-xs text-slate-400 font-medium">{t.overviewTab.cidrLabel}</span>
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-sm text-indigo-300 font-bold">{record.cidr}</span>
-              <button
-                onClick={() => handleCopy('cidr', record.cidr)}
-                className="text-slate-500 hover:text-slate-200"
-                title={t.common.copy}
-              >
-                {copiedKey === 'cidr' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1 pb-3 border-b border-slate-800">
-            <span className="text-xs text-slate-400 font-medium">{t.overviewTab.statusLabel}</span>
-            <div>
-              <span className="inline-block px-2.5 py-1 text-xs font-mono font-bold rounded bg-slate-800 text-cyan-300 border border-cyan-500/20">
-                {record.status}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1 pb-3 border-b border-slate-800">
-            <span className="text-xs text-slate-400 font-medium">{t.overviewTab.reverseDns}</span>
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-xs text-emerald-300 truncate" title={record.reverseDns || 'No PTR record found'}>
-                {record.reverseDns || <span className="text-slate-500 italic">{t.overviewTab.noReverseDns}</span>}
-              </span>
-              {record.reverseDns && (
-                <button
-                  onClick={() => handleCopy('rdns', record.reverseDns!)}
-                  className="text-slate-500 hover:text-slate-200 ml-2"
-                >
-                  {copiedKey === 'rdns' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1 pb-3 border-b border-slate-800">
-            <span className="text-xs text-slate-400 font-medium">{t.overviewTab.rirSource}</span>
-            <span className="font-semibold text-xs text-slate-200 uppercase tracking-wide">{record.source}</span>
-          </div>
-
-        </div>
-
-        {/* Network Description */}
         {record.description && record.description.length > 0 && (
-          <div className="mt-5 pt-4 border-t border-slate-800">
-            <span className="text-xs text-slate-400 font-medium block mb-2">{t.overviewTab.description}</span>
-            <div className="bg-slate-900/60 rounded-xl p-3.5 border border-slate-800/80 space-y-1">
+          <div style={{ marginTop: 20 }}>
+            <Text type="secondary" strong style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+              {t.overviewTab.description}
+            </Text>
+            <div
+              style={{
+                background: token.colorFillAlter,
+                padding: '12px 16px',
+                borderRadius: token.borderRadiusLG,
+                border: `1px solid ${token.colorBorderSecondary}`,
+              }}
+            >
               {record.description.map((desc, idx) => (
-                <p key={idx} className="text-xs text-slate-300 font-mono">
+                <Paragraph key={idx} style={{ margin: 0, fontFamily: 'monospace', fontSize: 13 }}>
                   {desc}
-                </p>
+                </Paragraph>
               ))}
             </div>
           </div>
         )}
+      </Card>
 
-      </div>
-
-      {/* Organization & Administrative Entities */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* Organization Box */}
-        <div className="bg-slate-850 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-              <Building className="w-4 h-4 text-blue-400" />
-              {t.overviewTab.orgTitle}
-            </h3>
-
-            <div className="space-y-3">
-              <div>
-                <span className="text-xs text-slate-400 block mb-0.5">{t.overviewTab.orgName}</span>
-                <span className="text-sm font-bold text-white block">
-                  {record.orgName || record.netname || t.overviewTab.autonomousOrg}
-                </span>
-              </div>
-
+      {/* Organization & Administration Row */}
+      <Row gutter={[16, 16]}>
+        {/* Organization Card */}
+        <Col xs={24} md={12}>
+          <Card
+            title={
+              <Space orientation="horizontal" size={8}>
+                <BankOutlined style={{ color: token.colorPrimary }} />
+                <span>{t.overviewTab.orgTitle}</span>
+              </Space>
+            }
+            style={{ height: '100%' }}
+          >
+            <Descriptions column={1} size="small">
+              <Descriptions.Item label={t.overviewTab.orgName}>
+                <Text strong>{record.orgName || record.netname || t.overviewTab.autonomousOrg}</Text>
+              </Descriptions.Item>
               {record.orgHandle && (
-                <div>
-                  <span className="text-xs text-slate-400 block mb-0.5">{t.overviewTab.orgHandle}</span>
-                  <button
+                <Descriptions.Item label={t.overviewTab.orgHandle}>
+                  <Button
+                    type="link"
+                    size="small"
+                    style={{ padding: 0, fontFamily: 'monospace' }}
                     onClick={() => onSearchResource(record.orgHandle!)}
-                    className="font-mono text-xs font-semibold text-cyan-400 hover:underline bg-slate-900/80 px-2 py-1 rounded border border-slate-700"
                   >
                     {record.orgHandle}
-                  </button>
-                </div>
+                  </Button>
+                </Descriptions.Item>
+              )}
+            </Descriptions>
+
+            {record.mntBy && record.mntBy.length > 0 && (
+              <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${token.colorBorderSecondary}` }}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>
+                  {t.overviewTab.mntBy}
+                </Text>
+                <Space wrap size={[6, 6]}>
+                  {record.mntBy.map((mnt, idx) => (
+                    <Tag
+                      key={idx}
+                      color="blue"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => onSearchResource(mnt)}
+                    >
+                      {mnt}
+                    </Tag>
+                  ))}
+                </Space>
+              </div>
+            )}
+          </Card>
+        </Col>
+
+        {/* Contacts Card */}
+        <Col xs={24} md={12}>
+          <Card
+            title={
+              <Space orientation="horizontal" size={8}>
+                <UserOutlined style={{ color: '#52c41a' }} />
+                <span>{t.overviewTab.adminContact}</span>
+              </Space>
+            }
+            style={{ height: '100%' }}
+          >
+            <Descriptions column={1} size="small">
+              <Descriptions.Item label={t.overviewTab.adminContactsLabel}>
+                {record.adminContacts && record.adminContacts.length > 0 ? (
+                  <Space wrap size={[6, 6]}>
+                    {record.adminContacts.map((c, idx) => (
+                      <Tag
+                        key={idx}
+                        color="green"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => onSearchResource(c.handle)}
+                      >
+                        {c.handle}
+                      </Tag>
+                    ))}
+                  </Space>
+                ) : (
+                  <Text type="secondary" italic>{t.overviewTab.inheritedContact}</Text>
+                )}
+              </Descriptions.Item>
+
+              <Descriptions.Item label={t.overviewTab.techContactsLabel}>
+                {record.techContacts && record.techContacts.length > 0 ? (
+                  <Space wrap size={[6, 6]}>
+                    {record.techContacts.map((c, idx) => (
+                      <Tag
+                        key={idx}
+                        color="cyan"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => onSearchResource(c.handle)}
+                      >
+                        {c.handle}
+                      </Tag>
+                    ))}
+                  </Space>
+                ) : (
+                  <Text type="secondary" italic>{t.overviewTab.inheritedContact}</Text>
+                )}
+              </Descriptions.Item>
+            </Descriptions>
+
+            <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${token.colorBorderSecondary}`, display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+              <Space orientation="horizontal" size={4}>
+                <ClockCircleOutlined style={{ color: token.colorTextSecondary }} />
+                <Text type="secondary">
+                  {t.overviewTab.created}: {record.created ? formatDate(record.created) : 'N/A'}
+                </Text>
+              </Space>
+              {record.lastModified && (
+                <Text type="secondary">
+                  {t.overviewTab.lastModified}: {formatDate(record.lastModified)}
+                </Text>
               )}
             </div>
-          </div>
-
-          {record.mntBy && record.mntBy.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-slate-800">
-              <span className="text-xs text-slate-400 block mb-1.5">{t.overviewTab.mntBy}</span>
-              <div className="flex flex-wrap gap-1.5">
-                {record.mntBy.map((mnt, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => onSearchResource(mnt)}
-                    className="text-[11px] font-mono font-medium px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
-                  >
-                    {mnt}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Contacts & Administration Box */}
-        <div className="bg-slate-850 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-              <User className="w-4 h-4 text-emerald-400" />
-              {t.overviewTab.adminContact}
-            </h3>
-
-            <div className="space-y-4">
-              
-              <div>
-                <span className="text-xs text-slate-400 block mb-1">{t.overviewTab.adminContactsLabel}</span>
-                {record.adminContacts && record.adminContacts.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {record.adminContacts.map((c, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => onSearchResource(c.handle)}
-                        className="font-mono text-xs text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-2 py-1 rounded"
-                      >
-                        {c.handle}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-xs text-slate-500 italic">{t.overviewTab.inheritedContact}</span>
-                )}
-              </div>
-
-              <div>
-                <span className="text-xs text-slate-400 block mb-1">{t.overviewTab.techContactsLabel}</span>
-                {record.techContacts && record.techContacts.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {record.techContacts.map((c, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => onSearchResource(c.handle)}
-                        className="font-mono text-xs text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 px-2 py-1 rounded"
-                      >
-                        {c.handle}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-xs text-slate-500 italic">{t.overviewTab.inheritedContact}</span>
-                )}
-              </div>
-
-            </div>
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-            <div className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-slate-500" />
-              <span>{t.overviewTab.created}: {record.created ? formatDate(record.created) : 'N/A'}</span>
-            </div>
-            {record.lastModified && (
-              <span>{t.overviewTab.lastModified}: {formatDate(record.lastModified)}</span>
-            )}
-          </div>
-
-        </div>
-
-      </div>
-
-    </div>
+          </Card>
+        </Col>
+      </Row>
+    </Space>
   );
 };

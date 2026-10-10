@@ -1,7 +1,16 @@
 import React from 'react';
-import { Settings, ShieldCheck, Globe, Moon, Sun, CheckCircle2, Server } from 'lucide-react';
+import { Card, Button, Typography, Space, Switch, Tag, Badge, theme } from 'antd';
+import {
+  SettingOutlined,
+  CloudServerOutlined,
+  GlobalOutlined,
+  SunOutlined,
+  MoonOutlined,
+} from '@ant-design/icons';
 import { useLanguage } from '../i18n/LanguageContext';
 import { LanguageSelector } from './LanguageSelector';
+
+const { Title, Text, Paragraph } = Typography;
 
 interface SettingsModalProps {
   isDarkTheme: boolean;
@@ -11,84 +20,97 @@ interface SettingsModalProps {
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isDarkTheme, onToggleTheme, onClose }) => {
   const { t } = useLanguage();
+  const { token } = theme.useToken();
 
   return (
-    <div className="max-w-xl mx-auto py-8 px-4">
-      <div className="bg-slate-850 rounded-2xl border border-slate-800 p-6 shadow-2xl space-y-6">
-        
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center">
-              <Settings className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-white">{t.settingsModal.title}</h2>
-              <p className="text-xs text-slate-400">IP-Hub v2.0</p>
-            </div>
-          </div>
-          <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono font-bold">
-            v2.0.0
-          </span>
-        </div>
-
-        <div className="space-y-4 text-xs">
-          
-          {/* Status */}
-          <div className="p-4 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Server className="w-5 h-5 text-cyan-400" />
-              <div>
-                <span className="text-slate-400 block">{t.settingsModal.status}</span>
-                <span className="font-semibold text-white">{t.settingsModal.connected}</span>
+    <div style={{ maxWidth: 580, margin: '32px auto', padding: '0 16px' }}>
+      <Card
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Space orientation="horizontal" size={10} align="center">
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: token.borderRadiusLG,
+                  background: token.colorPrimaryBg,
+                  color: token.colorPrimary,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 18,
+                }}
+              >
+                <SettingOutlined />
               </div>
-            </div>
-            <span className="flex items-center gap-1.5 text-emerald-400 font-bold font-mono">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              200 OK
-            </span>
+              <div>
+                <Title level={4} style={{ margin: 0, fontWeight: 700 }}>
+                  {t.settingsModal.title}
+                </Title>
+              </div>
+            </Space>
+            <Tag color="success" variant="filled" style={{ fontWeight: 700, fontFamily: 'monospace' }}>
+              v2.0.0
+            </Tag>
           </div>
+        }
+        actions={[
+          <div key="actions" style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 16px' }}>
+            <Button type="primary" onClick={onClose}>
+              {t.settingsModal.close}
+            </Button>
+          </div>,
+        ]}
+      >
+        <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+          {/* Status */}
+          <Card type="inner" size="small">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Space orientation="horizontal" size={10}>
+                <CloudServerOutlined style={{ color: token.colorPrimary, fontSize: 18 }} />
+                <div>
+                  <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>{t.settingsModal.status}</Text>
+                  <Text strong>{t.settingsModal.connected}</Text>
+                </div>
+              </Space>
+              <Badge status="processing" text={<Text strong style={{ color: '#52c41a', fontFamily: 'monospace' }}>200 OK</Text>} />
+            </div>
+          </Card>
 
           {/* Language Switch */}
-          <div className="p-4 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Globe className="w-5 h-5 text-indigo-400" />
-              <div>
-                <span className="text-slate-400 block">{t.settingsModal.language}</span>
-                <span className="font-semibold text-white">English / فارسی</span>
-              </div>
+          <Card type="inner" size="small">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Space orientation="horizontal" size={10}>
+                <GlobalOutlined style={{ color: '#722ed1', fontSize: 18 }} />
+                <div>
+                  <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>{t.settingsModal.language}</Text>
+                  <Text strong>English / پارسی</Text>
+                </div>
+              </Space>
+              <LanguageSelector />
             </div>
-            <LanguageSelector />
-          </div>
+          </Card>
 
           {/* Theme Preference */}
-          <div className="p-4 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {isDarkTheme ? <Moon className="w-5 h-5 text-amber-400" /> : <Sun className="w-5 h-5 text-cyan-400" />}
-              <div>
-                <span className="text-slate-400 block">{t.settingsModal.theme}</span>
-                <span className="font-semibold text-white">{isDarkTheme ? t.nav.themeDark : t.nav.themeLight}</span>
-              </div>
+          <Card type="inner" size="small">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Space orientation="horizontal" size={10}>
+                {isDarkTheme ? <MoonOutlined style={{ color: '#fa8c16', fontSize: 18 }} /> : <SunOutlined style={{ color: token.colorPrimary, fontSize: 18 }} />}
+                <div>
+                  <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>{t.settingsModal.theme}</Text>
+                  <Text strong>{isDarkTheme ? t.nav.themeDark : t.nav.themeLight}</Text>
+                </div>
+              </Space>
+              <Switch
+                checked={isDarkTheme}
+                onChange={onToggleTheme}
+                checkedChildren={<MoonOutlined />}
+                unCheckedChildren={<SunOutlined />}
+              />
             </div>
-            <button
-              onClick={onToggleTheme}
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold"
-            >
-              Toggle
-            </button>
-          </div>
-
-        </div>
-
-        <div className="pt-2 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all shadow-md shadow-cyan-600/30"
-          >
-            {t.settingsModal.close}
-          </button>
-        </div>
-
-      </div>
+          </Card>
+        </Space>
+      </Card>
     </div>
   );
 };

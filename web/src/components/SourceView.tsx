@@ -1,93 +1,148 @@
 import React from 'react';
-import { GitBranch, ExternalLink, ShieldCheck, Database, Zap, Cpu, Code2, Globe2 } from 'lucide-react';
+import { Card, Button, Row, Col, Tag, Typography, Space, theme } from 'antd';
+import {
+  GithubOutlined,
+  GlobalOutlined,
+  CodeOutlined,
+  ThunderboltOutlined,
+  SafetyCertificateOutlined,
+  DatabaseOutlined,
+  LinkOutlined,
+  ApiOutlined,
+} from '@ant-design/icons';
 import { useLanguage } from '../i18n/LanguageContext';
+
+const { Title, Paragraph, Text } = Typography;
 
 export const SourceView: React.FC = () => {
   const { t } = useLanguage();
+  const { token } = theme.useToken();
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto py-6 px-4">
-
-      {/* Header Banner */}
-      <div className="bg-slate-850 rounded-2xl border border-slate-800 p-6 md:p-8 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 text-white shrink-0">
-            <GitBranch className="w-7 h-7" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-white tracking-tight">{t.sourcePage.title}</h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 text-xs font-semibold">
-                {t.sourcePage.badge}
-              </span>
+    <div style={{ maxWidth: 960, margin: '0 auto', padding: '24px 16px' }}>
+      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+        {/* Header Banner */}
+        <Card>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: token.borderRadiusLG,
+                background: token.colorPrimary,
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 26,
+                flexShrink: 0,
+              }}
+            >
+              <GithubOutlined />
             </div>
-            <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-3xl leading-relaxed">
-              {t.sourcePage.intro}
-            </p>
+            <div>
+              <Space orientation="horizontal" size={8} align="center">
+                <Title level={3} style={{ margin: 0, fontWeight: 800 }}>
+                  {t.sourcePage.title}
+                </Title>
+                <Tag color="processing" variant="filled" style={{ fontWeight: 600 }}>
+                  {t.sourcePage.badge}
+                </Tag>
+              </Space>
+              <Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 13 }}>
+                {t.sourcePage.intro}
+              </Paragraph>
+            </div>
           </div>
-        </div>
 
-        {/* Action Link Buttons Row */}
-        <div className="mt-6 pt-5 border-t border-slate-800/80 grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2.5 sm:gap-3">
-          <a
-            href="https://ip-hub.ir/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3 sm:px-4 py-2 sm:py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 sm:gap-2 transition-all shadow-md shadow-cyan-600/30 text-center"
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${token.colorBorderSecondary}` }}>
+            <Space orientation="horizontal" size={10} wrap>
+              <Button
+                type="primary"
+                icon={<GlobalOutlined />}
+                href="https://ip-hub.ir/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t.sourcePage.projectPage}
+              </Button>
+              <Button
+                icon={<GithubOutlined />}
+                href="https://github.com/kzeedev/IP-Hub"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t.sourcePage.githubRepo}
+              </Button>
+            </Space>
+          </div>
+        </Card>
+
+        {/* Feature Grid */}
+        <Card
+          title={
+            <Space orientation="horizontal" size={8}>
+              <ApiOutlined style={{ color: token.colorPrimary }} />
+              <span>{t.sourcePage.featuresTitle}</span>
+            </Space>
+          }
+        >
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12}>
+              <Card type="inner" size="small">
+                <Space orientation="horizontal" size={10} align="start">
+                  <DatabaseOutlined style={{ color: token.colorPrimary, fontSize: 18, marginTop: 2 }} />
+                  <Paragraph style={{ margin: 0, fontSize: 13 }}>{t.sourcePage.feature1}</Paragraph>
+                </Space>
+              </Card>
+            </Col>
+
+            <Col xs={24} sm={12}>
+              <Card type="inner" size="small">
+                <Space orientation="horizontal" size={10} align="start">
+                  <CodeOutlined style={{ color: '#722ed1', fontSize: 18, marginTop: 2 }} />
+                  <Paragraph style={{ margin: 0, fontSize: 13 }}>{t.sourcePage.feature2}</Paragraph>
+                </Space>
+              </Card>
+            </Col>
+
+            <Col xs={24} sm={12}>
+              <Card type="inner" size="small">
+                <Space orientation="horizontal" size={10} align="start">
+                  <ThunderboltOutlined style={{ color: '#fa8c16', fontSize: 18, marginTop: 2 }} />
+                  <Paragraph style={{ margin: 0, fontSize: 13 }}>{t.sourcePage.feature3}</Paragraph>
+                </Space>
+              </Card>
+            </Col>
+
+            <Col xs={24} sm={12}>
+              <Card type="inner" size="small">
+                <Space orientation="horizontal" size={10} align="start">
+                  <SafetyCertificateOutlined style={{ color: '#52c41a', fontSize: 18, marginTop: 2 }} />
+                  <Paragraph style={{ margin: 0, fontSize: 13 }}>{t.sourcePage.feature4}</Paragraph>
+                </Space>
+              </Card>
+            </Col>
+          </Row>
+
+          <div
+            style={{
+              marginTop: 20,
+              padding: 16,
+              borderRadius: token.borderRadiusLG,
+              background: token.colorFillAlter,
+              border: `1px solid ${token.colorBorderSecondary}`,
+            }}
           >
-            <Globe2 className="w-4 h-4 shrink-0" />
-            <span className="truncate">{t.sourcePage.projectPage}</span>
-            <ExternalLink className="w-3.5 h-3.5 shrink-0 hidden xs:inline-block sm:inline-block" />
-          </a>
-
-          <a
-            href="https://github.com/kzeedev/IP-Hub"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 sm:gap-2 transition-all shadow-sm text-center"
-          >
-            <GitBranch className="w-4 h-4 text-cyan-400 shrink-0" />
-            <span className="truncate">{t.sourcePage.githubRepo}</span>
-            <ExternalLink className="w-3.5 h-3.5 shrink-0 hidden xs:inline-block sm:inline-block" />
-          </a>
-        </div>
-      </div>
-
-      {/* Feature Grid */}
-      <div className="bg-slate-850 rounded-2xl border border-slate-800 p-6 md:p-8 space-y-6">
-        <h2 className="text-base font-bold text-white flex items-center gap-2">
-          <Cpu className="w-5 h-5 text-cyan-400" />
-          <span>{t.sourcePage.featuresTitle}</span>
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs sm:text-sm">
-          <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-3">
-            <Database className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
-            <p className="text-slate-300 leading-relaxed">{t.sourcePage.feature1}</p>
+            <Text strong style={{ fontSize: 14, display: 'block', marginBottom: 4 }}>
+              {t.sourcePage.communityTitle}
+            </Text>
+            <Paragraph type="secondary" style={{ margin: 0, fontSize: 13 }}>
+              {t.sourcePage.communityText}
+            </Paragraph>
           </div>
-
-          <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-3">
-            <Code2 className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
-            <p className="text-slate-300 leading-relaxed">{t.sourcePage.feature2}</p>
-          </div>
-
-          <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-3">
-            <Zap className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-            <p className="text-slate-300 leading-relaxed">{t.sourcePage.feature3}</p>
-          </div>
-
-          <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-3">
-            <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-            <p className="text-slate-300 leading-relaxed">{t.sourcePage.feature4}</p>
-          </div>
-        </div>
-
-        <div className="p-5 bg-cyan-500/5 rounded-xl border border-cyan-500/20 text-xs text-slate-300 space-y-2">
-          <h3 className="font-bold text-white text-sm">{t.sourcePage.communityTitle}</h3>
-          <p className="leading-relaxed">{t.sourcePage.communityText}</p>
-        </div>
-      </div>
-
+        </Card>
+      </Space>
     </div>
   );
 };

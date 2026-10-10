@@ -361,7 +361,7 @@ export const translations = {
       "guide3": "Pull requests for new firewall formatters, plugin enhancements, and translations are always appreciated."
     },
     "settingsModal": {
-      "title": "Settings & Application Info",
+      "title": "Settings",
       "version": "Application Version",
       "status": "Backend Status",
       "connected": "Network Services Online",
@@ -792,7 +792,7 @@ export const translations = {
       "guide3": "پول‌ریکوئست‌های ارائه‌دهنده فرمت‌های جدید فایروال و ترجمه‌ها با استقبال ادغام می‌شوند."
     },
     "settingsModal": {
-      "title": "تنظیمات و اطلاعات سیستم",
+      "title": "تنظیمات",
       "version": "نسخه برنامه",
       "status": "وضعیت بک‌ند",
       "connected": "سرویس‌های شبکه فعال هستند",

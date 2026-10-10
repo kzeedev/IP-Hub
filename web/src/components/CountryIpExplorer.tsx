@@ -1,27 +1,36 @@
 import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from 'react';
 import {
-  Globe2,
-  Search,
-  Download,
-  Copy,
-  Check,
-  ExternalLink,
-  Layers,
-  Network,
-  Radio,
-  Hash,
-  SlidersHorizontal,
-  FileText,
-  FileSpreadsheet,
-  FileCode,
-  ShieldCheck,
-  RefreshCw,
-  Building2,
-  Terminal,
-  Code2,
-  CheckCircle2,
-  Filter,
-} from 'lucide-react';
+  Card,
+  Row,
+  Col,
+  Select,
+  Input,
+  Button,
+  Tabs,
+  Table,
+  Tag,
+  Typography,
+  Space,
+  Statistic,
+  Alert,
+  theme,
+  Spin,
+  BorderBeam,
+} from 'antd';
+import {
+  GlobalOutlined,
+  DownloadOutlined,
+  CopyOutlined,
+  CheckOutlined,
+  LinkOutlined,
+  ReloadOutlined,
+  CloudServerOutlined,
+  RadarChartOutlined,
+  NumberOutlined,
+  CodeOutlined,
+  SearchOutlined,
+  FilterOutlined,
+} from '@ant-design/icons';
 import { CountryIpResource, ExportFormat, IpVersionOption, AccessTypeOption, FormatResult, PluginFormat } from '../types';
 import { ALL_COUNTRIES, POPULAR_COUNTRIES, getCountryDetails } from '../utils/countries';
 import { copyToClipboard, downloadText } from '../utils/helpers';
@@ -29,20 +38,18 @@ import { getRouteUrl } from '../utils/router';
 import { useLanguage } from '../i18n/LanguageContext';
 import { FlagIcon } from './FlagIcon';
 
+const { Text, Title, Paragraph } = Typography;
+
 interface CountryIpExplorerProps {
   onInspectResource: (resource: string) => void;
 }
 
 type TabType = 'ipv4' | 'ipv6' | 'asns';
 
-export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
-  onInspectResource,
-}) => {
-  const { language, t, isRtl } = useLanguage();
+export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({ onInspectResource }) => {
+  const { language, t } = useLanguage();
+  const { token } = theme.useToken();
   const [selectedCountry, setSelectedCountry] = useState<string>('');
-  const [countrySearchQuery, setCountrySearchQuery] = useState<string>('');
-  const deferredCountrySearch = useDeferredValue(countrySearchQuery);
-  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
 
   const [data, setData] = useState<CountryIpResource | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -61,7 +68,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   const [isLoadingPlugins, setIsLoadingPlugins] = useState<boolean>(true);
 
   // Derived formats list from pluginsList IDs
-  const formats: string[] = useMemo(() => pluginsList.map(p => p.id), [pluginsList]);
+  const formats: string[] = useMemo(() => pluginsList.map((p) => p.id), [pluginsList]);
 
   // Firewall Generator States
   const [format, setFormat] = useState<ExportFormat>('mikrotik');
@@ -70,7 +77,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   const [customListName, setCustomListName] = useState<string>('');
   const [isConfigCopied, setIsConfigCopied] = useState<boolean>(false);
 
-  // Fetch available plugins from backend dynamically on mount and derive formats list
+  // Fetch available plugins from backend dynamically on mount
   useEffect(() => {
     let isMounted = true;
     const fetchPlugins = async () => {
@@ -81,8 +88,8 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
           const list: PluginFormat[] = json.plugins || [];
           if (isMounted && list.length > 0) {
             setPluginsList(list);
-            const availableFormatIds = list.map(p => p.id);
-            setFormat(currentFormat => {
+            const availableFormatIds = list.map((p) => p.id);
+            setFormat((currentFormat) => {
               if (currentFormat && availableFormatIds.includes(currentFormat)) {
                 return currentFormat;
               }
@@ -110,7 +117,6 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
 
   // Copy feedback for individual table items
   const [copiedItem, setCopiedItem] = useState<string | null>(null);
-  const [isTableCopied, setIsTableCopied] = useState<boolean>(false);
 
   // Generated firewall script from server-side plugins
   const [generatedScript, setGeneratedScript] = useState<FormatResult>({ text: '', filename: '', ruleCount: 0 });
@@ -153,7 +159,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
         if (json.data?.prefixOrgs) {
           Object.assign(orgMap, json.data.prefixOrgs);
         }
-        setResolvedOrgs(prev => ({ ...prev, ...orgMap }));
+        setResolvedOrgs((prev) => ({ ...prev, ...orgMap }));
       }
     } catch (err: any) {
       setError(err.message || t.countryExplorer.apiError);
@@ -191,13 +197,13 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
       }),
       signal: controller.signal,
     })
-      .then(res => (res.ok ? res.json() : null))
-      .then(json => {
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
         if (json?.result) {
           setGeneratedScript(json.result);
         }
       })
-      .catch(err => {
+      .catch((err) => {
         if (err.name !== 'AbortError') {
           // ignore
         }
@@ -206,19 +212,28 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
     return () => controller.abort();
   }, [format, ipVersion, accessType, customListName]);
 
-  // Filter countries for dropdown with bilingual name support
-  const filteredCountries = useMemo(() => {
-    const q = deferredCountrySearch.toLowerCase().trim();
-    return ALL_COUNTRIES.map(c => ({
-      ...c,
-      name: language === 'fa' ? c.faName : c.name,
-    })).filter(
-      c => !q || c.name.toLowerCase().includes(q) || c.faName.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || c.region.toLowerCase().includes(q)
-    );
-  }, [deferredCountrySearch, language]);
+  // Country select options
+  const countryOptions = useMemo(() => {
+    return ALL_COUNTRIES.map((c) => {
+      const localized = language === 'fa' ? c.faName : c.name;
+      return {
+        value: c.code,
+        label: (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Space orientation="horizontal" size={8} align="center">
+              <FlagIcon code={c.code} className="w-4 h-3 rounded-[2px]" />
+              <span>{localized}</span>
+            </Space>
+            <Tag style={{ margin: 0, fontFamily: 'monospace' }}>{c.code}</Tag>
+          </div>
+        ),
+        searchKey: `${c.code} ${c.name} ${c.faName} ${localized}`.toLowerCase(),
+      };
+    });
+  }, [language]);
 
   const popularCountries = useMemo(() => {
-    return POPULAR_COUNTRIES.map(c => ({
+    return POPULAR_COUNTRIES.map((c) => ({
       ...c,
       name: language === 'fa' ? c.faName : c.name,
     }));
@@ -232,7 +247,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
     const q = deferredListSearch.trim().toLowerCase();
 
     if (activeTab === 'ipv4') {
-      return data.ipv4.filter(prefix => {
+      return data.ipv4.filter((prefix) => {
         const org = (resolvedOrgs[prefix] || '').toLowerCase();
         const matchesSearch = !q || prefix.toLowerCase().includes(q) || org.includes(q);
         if (!matchesSearch) return false;
@@ -240,7 +255,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
         return prefix.endsWith(`/${cidrFilter}`);
       });
     } else if (activeTab === 'ipv6') {
-      return data.ipv6.filter(prefix => {
+      return data.ipv6.filter((prefix) => {
         const org = (resolvedOrgs[prefix] || '').toLowerCase();
         const matchesSearch = !q || prefix.toLowerCase().includes(q) || org.includes(q);
         if (!matchesSearch) return false;
@@ -249,8 +264,8 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
       });
     } else {
       return data.asns
-        .map(a => `AS${a}`)
-        .filter(asnStr => {
+        .map((a) => `AS${a}`)
+        .filter((asnStr) => {
           const cleanAsn = asnStr.replace(/^AS/i, '');
           const org = (resolvedOrgs[asnStr] || resolvedOrgs[cleanAsn] || '').toLowerCase();
           return !q || asnStr.toLowerCase().includes(q) || org.includes(q);
@@ -258,7 +273,6 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
     }
   }, [data, activeTab, deferredListSearch, cidrFilter, resolvedOrgs]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredList.length / itemsPerPage));
   const paginatedList = useMemo(() => {
     const start = (page - 1) * itemsPerPage;
     return filteredList.slice(start, start + itemsPerPage);
@@ -294,10 +308,10 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prefixes: missingPrefixes, asns: missingAsns }),
     })
-      .then(res => (res.ok ? res.json() : { orgs: {} }))
-      .then(resData => {
+      .then((res) => (res.ok ? res.json() : { orgs: {} }))
+      .then((resData) => {
         if (isMounted && resData?.orgs && Object.keys(resData.orgs).length > 0) {
-          setResolvedOrgs(prev => ({ ...prev, ...resData.orgs }));
+          setResolvedOrgs((prev) => ({ ...prev, ...resData.orgs }));
         }
       })
       .catch(() => { })
@@ -322,7 +336,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
     if (!data || activeTab === 'asns') return [];
     const counts = new Map<string, number>();
     const list = activeTab === 'ipv4' ? data.ipv4 : data.ipv6;
-    list.forEach(p => {
+    list.forEach((p) => {
       if (p.includes('/')) {
         const c = p.split('/')[1];
         counts.set(c, (counts.get(c) || 0) + 1);
@@ -348,658 +362,486 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   const handleCopySingle = (val: string) => {
     copyToClipboard(val);
     setCopiedItem(val);
-    setTimeout(() => setCopiedItem(null), 1500);
+    setTimeout(() => setCopiedItem(null), 2000);
   };
 
-  const handleCopyAllTable = () => {
-    if (!data) return;
-    let text = '';
-    if (activeTab === 'ipv4') text = data.ipv4.join('\n');
-    else if (activeTab === 'ipv6') text = data.ipv6.join('\n');
-    else text = data.asns.map(a => `AS${a}`).join('\n');
-    copyToClipboard(text);
-    setIsTableCopied(true);
-    setTimeout(() => setIsTableCopied(false), 2000);
-  };
-
-  const calculateIpv4HostCount = (prefix: string): string => {
-    if (!prefix.includes('/')) return '1';
-    const mask = parseInt(prefix.split('/')[1], 10);
-    if (isNaN(mask) || mask < 0 || mask > 32) return '1';
-    const hosts = Math.pow(2, 32 - mask);
-    return hosts.toLocaleString();
-  };
+  const tableColumns = [
+    {
+      title: activeTab === 'asns' ? 'ASN' : t.countryExplorer.colResource,
+      dataIndex: 'item',
+      key: 'item',
+      render: (item: string) => (
+        <Space orientation="horizontal" size={8}>
+          <Text strong style={{ fontFamily: 'monospace', color: token.colorPrimary }}>
+            {item}
+          </Text>
+        </Space>
+      ),
+    },
+    {
+      title: t.countryExplorer.colOrg,
+      key: 'isp',
+      render: (_: any, record: { item: string }) => {
+        const org = getOrgForItem(record.item);
+        if (org) {
+          return <Text strong>{org}</Text>;
+        }
+        if (isResolvingOrgs) {
+          return <Text type="secondary" italic>{t.countryExplorer.resolving}</Text>;
+        }
+        return <Text type="secondary" italic>{t.countryExplorer.unknownOrg}</Text>;
+      },
+    },
+    {
+      title: t.countryExplorer.colActions,
+      key: 'actions',
+      align: 'right' as const,
+      render: (_: any, record: { item: string }) => (
+        <Space orientation="horizontal" size={4}>
+          <Button
+            type="text"
+            size="small"
+            icon={copiedItem === record.item ? <CheckOutlined style={{ color: '#52c41a' }} /> : <CopyOutlined />}
+            onClick={() => handleCopySingle(record.item)}
+            title={t.common.copy}
+          />
+          <Button
+            type="link"
+            size="small"
+            icon={<LinkOutlined />}
+            onClick={() => onInspectResource(record.item)}
+            title={t.countryExplorer.openWhoisTooltip}
+          />
+        </Space>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
+      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+        {/* Generator Form Card */}
+        <Card
+          title={
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+              <Space orientation="horizontal" size={10}>
+                <GlobalOutlined style={{ color: token.colorPrimary, fontSize: 20 }} />
+                <div>
+                  <Title level={4} style={{ margin: 0, fontWeight: 800 }}>
+                    {t.countryExplorer.title}
+                  </Title>
+                  <Paragraph type="secondary" style={{ margin: 0, fontSize: 12 }}>
+                    {t.countryExplorer.description}
+                  </Paragraph>
+                </div>
+              </Space>
 
-      {/* ======================================================== */}
-      {/* ======================================================== */}
-      {/* Country IP Allocations & Firewall Generator (Form Card)   */}
-      {/* ======================================================== */}
-      <div className="bg-slate-850 rounded-2xl border border-slate-800 p-6 shadow-sm space-y-5">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center shadow-inner shrink-0">
-            <Globe2 className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-white tracking-tight">{t.countryExplorer.title}</h1>
-              <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[10px] font-mono font-semibold uppercase">
-                RIPEstat &amp; GeoIP
-              </span>
+              {currentMeta && (
+                <Tag color="blue" style={{ fontSize: 12, padding: '4px 8px' }}>
+                  <FlagIcon code={currentMeta.code} className="w-4 h-3 rounded-[2px]" />
+                  <span style={{ marginInlineStart: 6, fontWeight: 700 }}>{currentMeta.name}</span>
+                </Tag>
+              )}
             </div>
-            <p className="text-xs sm:text-sm text-slate-400 mt-0.5 leading-relaxed">
-              {t.countryExplorer.description}
-            </p>
-          </div>
-        </div>
-
-        {/* Unified Form Controls */}
-        <form onSubmit={e => e.preventDefault()} className="space-y-4 pt-3 border-t border-slate-800/80">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-
+          }
+        >
+          <Row gutter={[16, 16]}>
             {/* 1. Country Selection */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 block">
+            <Col xs={24} md={8}>
+              <Text strong style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>
                 {t.countryExplorer.selectCountry}
-              </label>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="w-full px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-left text-xs font-semibold text-white flex items-center justify-between gap-2 transition-colors shadow-sm h-[38px]"
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <FlagIcon code={currentMeta.code} className="w-4 h-3 rounded-[2px] shrink-0" />
-                    <span className="truncate">{currentMeta.name}</span>
-                    <span className="text-[10px] text-cyan-400 font-mono">({currentMeta.code})</span>
-                  </div>
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                </button>
-
-                {isDropdownOpen && (
-                  <div className={`absolute ${isRtl ? 'right-0' : 'left-0'} mt-2 w-72 sm:w-80 max-w-[90vw] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 p-3 space-y-2`}>
-                    <div className="relative">
-                      <Search className={`w-4 h-4 absolute ${isRtl ? 'right-3' : 'left-3'} top-2.5 text-slate-400`} />
-                      <input
-                        type="text"
-                        value={countrySearchQuery}
-                        onChange={e => setCountrySearchQuery(e.target.value)}
-                        placeholder={t.countryExplorer.searchCountry}
-                        className={`w-full ${isRtl ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500`}
-                        autoFocus
-                      />
-                    </div>
-
-                    <div className="max-h-64 overflow-y-auto space-y-1 divide-y divide-slate-800/40">
-                      {filteredCountries.map(c => (
-                        <a
-                          key={c.code}
-                          href={getRouteUrl('country-ips', { countryCode: c.code, lang: language })}
-                          hrefLang={language}
-                          onClick={(e) => {
-                            if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
-                              e.preventDefault();
-                              setSelectedCountry(c.code);
-                              setIsDropdownOpen(false);
-                              setCountrySearchQuery('');
-                            }
-                          }}
-                          className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${c.code === selectedCountry
-                            ? 'bg-cyan-600 text-white font-bold'
-                            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                            }`}
-                        >
-                          <div className="flex items-center gap-2.5 truncate">
-                            <FlagIcon code={c.code} className="w-4 h-3 rounded-[2px]" />
-                            <span className="truncate">{c.name}</span>
-                          </div>
-                          <span className={`text-[10px] font-mono ${c.code === selectedCountry ? 'text-cyan-100' : 'text-slate-500'}`}>
-                            {c.code}
-                          </span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+              </Text>
+              <Select
+                showSearch={{
+                  filterOption: (input, option) =>
+                    Boolean((option as any)?.searchKey?.includes(input.toLowerCase().trim())),
+                }}
+                style={{ width: '100%' }}
+                placeholder={t.countryExplorer.searchCountry}
+                value={selectedCountry || undefined}
+                onChange={setSelectedCountry}
+                options={countryOptions}
+              />
+            </Col>
 
             {/* 2. Format Selection */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 block">
+            <Col xs={24} sm={12} md={4}>
+              <Text strong style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>
                 {t.countryExplorer.formatLabel}
-              </label>
-              <select
+              </Text>
+              <Select
+                style={{ width: '100%' }}
                 value={format}
-                onChange={e => setFormat(e.target.value as ExportFormat)}
-                disabled={isLoadingPlugins && pluginsList.length === 0}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-semibold h-[38px] disabled:opacity-50"
-              >
-                {pluginsList.length > 0 ? (
-                  pluginsList.map(p => {
-                    const label =
-                      (t.countryExplorer.formats as Record<string, string>)?.[p.id] ||
-                      (p.id === 'freebsd-pf' ? (t.countryExplorer.formats as Record<string, string>)?.pf : null) ||
-                      p.name ||
-                      p.id;
-                    return (
-                      <option key={p.id} value={p.id}>
-                        {label}
-                      </option>
-                    );
-                  })
-                ) : (
-                  <option value={format}>
-                    {(t.countryExplorer.formats as Record<string, string>)?.[format] || format}
-                  </option>
-                )}
-              </select>
-            </div>
-
-            {/* 3. IP Version Selection */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 block">
-                {t.countryExplorer.versionLabel}
-              </label>
-              <select
-                value={ipVersion}
-                onChange={e => setIpVersion(e.target.value as IpVersionOption)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-semibold h-[38px]"
-              >
-                <option value="any">{t.countryExplorer.versions.any}</option>
-                <option value="ipv4">{t.countryExplorer.versions.ipv4}</option>
-                <option value="ipv6">{t.countryExplorer.versions.ipv6}</option>
-              </select>
-            </div>
-
-            {/* 4. Access Policy Selection */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 block">
-                {t.countryExplorer.accessLabel}
-              </label>
-              <select
-                value={accessType}
-                onChange={e => setAccessType(e.target.value as AccessTypeOption)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-semibold h-[38px]"
-              >
-                <option value="allow">{t.countryExplorer.access.allow}</option>
-                <option value="deny">{t.countryExplorer.access.deny}</option>
-              </select>
-            </div>
-
-            {/* 5. Address List / ACL Name */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 block">
-                {t.countryExplorer.listNameLabel}
-              </label>
-              <input
-                type="text"
-                value={customListName}
-                onChange={e => setCustomListName(e.target.value)}
-                placeholder={data?.countryCode || selectedCountry}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono font-semibold h-[38px]"
+                onChange={setFormat}
+                loading={isLoadingPlugins}
+                options={
+                  pluginsList.length > 0
+                    ? pluginsList.map((p) => ({
+                      value: p.id,
+                      label:
+                        (t.countryExplorer.formats as Record<string, string>)?.[p.id] ||
+                        (p.id === 'freebsd-pf' ? (t.countryExplorer.formats as Record<string, string>)?.pf : null) ||
+                        p.name ||
+                        p.id,
+                    }))
+                    : [{ value: format, label: (t.countryExplorer.formats as Record<string, string>)?.[format] || format }]
+                }
               />
-            </div>
+            </Col>
 
-          </div>
+            {/* 3. IP Version */}
+            <Col xs={24} sm={12} md={4}>
+              <Text strong style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>
+                {t.countryExplorer.versionLabel}
+              </Text>
+              <Select
+                style={{ width: '100%' }}
+                value={ipVersion}
+                onChange={setIpVersion}
+                options={[
+                  { value: 'any', label: t.countryExplorer.versions.any },
+                  { value: 'ipv4', label: t.countryExplorer.versions.ipv4 },
+                  { value: 'ipv6', label: t.countryExplorer.versions.ipv6 },
+                ]}
+              />
+            </Col>
 
-          {/* Popular Country Chips */}
-          <div className="pt-2 flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-            <span className="text-slate-400 font-semibold text-[11px] uppercase tracking-wider shrink-0 mr-1">
-              {t.countryExplorer.topRegions}
-            </span>
-            {popularCountries.map(c => (
-              <a
+            {/* 4. Access Policy */}
+            <Col xs={24} sm={12} md={4}>
+              <Text strong style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>
+                {t.countryExplorer.accessLabel}
+              </Text>
+              <Select
+                style={{ width: '100%' }}
+                value={accessType}
+                onChange={setAccessType}
+                options={[
+                  { value: 'allow', label: t.countryExplorer.access.allow },
+                  { value: 'deny', label: t.countryExplorer.access.deny },
+                ]}
+              />
+            </Col>
+
+            {/* 5. List Name */}
+            <Col xs={24} sm={12} md={4}>
+              <Text strong style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>
+                {t.countryExplorer.listNameLabel}
+              </Text>
+              <Input
+                value={customListName}
+                onChange={(e) => setCustomListName(e.target.value)}
+                placeholder={data?.countryCode || selectedCountry}
+                style={{ fontFamily: 'monospace' }}
+              />
+            </Col>
+          </Row>
+
+          {/* Popular Countries Chips */}
+          <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${token.colorBorderSecondary}`, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+            <Text type="secondary" strong style={{ fontSize: 11, textTransform: 'uppercase', marginInlineEnd: 6 }}>
+              {t.countryExplorer.topRegions}:
+            </Text>
+            {popularCountries.map((c) => (
+              <Tag
                 key={c.code}
-                href={getRouteUrl('country-ips', { countryCode: c.code, lang: language })}
-                hrefLang={language}
-                onClick={(e) => {
-                  if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
-                    e.preventDefault();
-                    setSelectedCountry(c.code);
-                  }
-                }}
-                className={`px-3 py-1.5 rounded-xl border font-medium flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${c.code === selectedCountry
-                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-sm font-bold'
-                  : 'bg-slate-900/80 text-slate-300 border-slate-800 hover:bg-slate-800 hover:border-slate-700 hover:text-white'
-                  }`}
+                color={c.code === selectedCountry ? 'blue' : 'default'}
+                style={{ cursor: 'pointer', padding: '2px 8px' }}
+                onClick={() => setSelectedCountry(c.code)}
               >
-                <FlagIcon code={c.code} className="w-4 h-3 rounded-[2px]" />
-                <span>{c.name}</span>
-                <span className="text-[10px] font-mono text-slate-500">({c.code})</span>
-              </a>
+                <FlagIcon code={c.code} className="w-3.5 h-2.5 rounded-[2px]" />
+                <span style={{ marginInlineStart: 4 }}>{c.name}</span>
+                <span style={{ fontFamily: 'monospace', marginInlineStart: 4, opacity: 0.7 }}>({c.code})</span>
+              </Tag>
             ))}
           </div>
-        </form>
-      </div>
+        </Card>
 
-      {/* Metrics Banner */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-pulse">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-28 bg-slate-850 rounded-2xl border border-slate-800" />
-          ))}
-        </div>
-      ) : data ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-
-          <div
-            onClick={() => setActiveTab('ipv4')}
-            className={`p-5 rounded-2xl border cursor-pointer transition-all ${activeTab === 'ipv4'
-              ? 'bg-cyan-500/10 border-cyan-500/50 shadow-lg shadow-cyan-500/10'
-              : 'bg-slate-850 border-slate-800 hover:border-slate-700'
-              }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider">{t.countryExplorer.ipv4Allocations}</span>
-              <Network className="w-4 h-4 text-cyan-400" />
-            </div>
-            <div className="text-2xl font-bold text-white font-mono">
-              {data.ipv4Count.toLocaleString()}
-            </div>
-            <p className="text-[11px] text-cyan-400 mt-1">{t.countryExplorer.prefixBlocks}</p>
-          </div>
-
-          <div
-            onClick={() => setActiveTab('ipv6')}
-            className={`p-5 rounded-2xl border cursor-pointer transition-all ${activeTab === 'ipv6'
-              ? 'bg-indigo-500/10 border-indigo-500/50 shadow-lg shadow-indigo-500/10'
-              : 'bg-slate-850 border-slate-800 hover:border-slate-700'
-              }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider">{t.countryExplorer.ipv6Allocations}</span>
-              <Layers className="w-4 h-4 text-indigo-400" />
-            </div>
-            <div className="text-2xl font-bold text-white font-mono">
-              {data.ipv6Count.toLocaleString()}
-            </div>
-            <p className="text-[11px] text-indigo-400 mt-1">{t.countryExplorer.nextGenPrefixes}</p>
-          </div>
-
-          <div
-            onClick={() => setActiveTab('asns')}
-            className={`p-5 rounded-2xl border cursor-pointer transition-all ${activeTab === 'asns'
-              ? 'bg-amber-500/10 border-amber-500/50 shadow-lg shadow-amber-500/10'
-              : 'bg-slate-850 border-slate-800 hover:border-slate-700'
-              }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider">{t.countryExplorer.originAsns}</span>
-              <Radio className="w-4 h-4 text-amber-400" />
-            </div>
-            <div className="text-2xl font-bold text-white font-mono">
-              {data.asnCount.toLocaleString()}
-            </div>
-            <p className="text-[11px] text-amber-400 mt-1">{t.countryExplorer.asNetworks}</p>
-          </div>
-
-          <div className="p-5 bg-slate-850 rounded-2xl border border-slate-800">
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider">{t.countryExplorer.estCapacity}</span>
-              <Hash className="w-4 h-4 text-emerald-400" />
-            </div>
-            <div className="text-2xl font-bold text-emerald-400 font-mono">
-              {data.totalEstimatedIpv4Addresses > 1000000
-                ? `${(data.totalEstimatedIpv4Addresses / 1000000).toFixed(1)}M`
-                : data.totalEstimatedIpv4Addresses.toLocaleString()}
-            </div>
-            <p className="text-[11px] text-slate-400 mt-1">{t.countryExplorer.totalRouted}</p>
-          </div>
-
-        </div>
-      ) : null}
-
-      {error && (
-        <div className="p-5 bg-red-500/10 border border-red-500/30 rounded-2xl text-red-300 flex items-start justify-between gap-4">
-          <div>
-            <span className="font-bold text-sm block">{t.countryExplorer.loadError}</span>
-            <p className="text-xs mt-1 text-red-300/90">{error}</p>
-          </div>
-          <button
-            onClick={() => fetchCountryData(selectedCountry)}
-            className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            {t.search.retry}
-          </button>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* Configuration Result Card                                */}
-      {/* ======================================================== */}
-      {generatedScript.text && (
-        <div className="bg-slate-850 rounded-2xl border border-slate-800 p-6 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center shrink-0">
-                <Code2 className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                    {t.countryExplorer.previewRules}
-                  </h2>
-                  <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-xs font-mono font-semibold">
-                    {generatedScript.ruleCount.toLocaleString()} {t.countryExplorer.rulesGenerated}
-                  </span>
-                  <span className="px-2 py-0.5 rounded-md bg-slate-900 text-slate-300 border border-slate-700/80 text-xs font-mono">
-                    {generatedScript.filename}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {t.countryExplorer.generatorDesc}
-                </p>
-              </div>
-            </div>
-
-            {/* Actions: Copy & Download */}
-            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-              <button
-                type="button"
-                onClick={handleCopyGenerated}
-                className="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-cyan-600/30 active:scale-95"
+        {/* Metrics Banner (Top of Configuration Result Card) */}
+        {isLoading ? (
+          <Row gutter={[16, 16]}>
+            {[1, 2, 3, 4].map((i) => (
+              <Col key={i} xs={24} sm={12} lg={6}>
+                <Card loading />
+              </Col>
+            ))}
+          </Row>
+        ) : data ? (
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12} lg={6}>
+              <BorderBeam
+                size={120}
+                duration={6}
+                color={[
+                  { color: '#1677ff', percent: 0 },
+                  { color: '#36cfc9', percent: 50 },
+                  { color: '#95de64', percent: 100 },
+                ]}
+                style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
               >
-                {isConfigCopied ? (
-                  <>
-                    <Check className="w-4 h-4 text-emerald-300" />
-                    <span>{t.countryExplorer.copied}</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4" />
-                    <span>{t.countryExplorer.copyScript}</span>
-                  </>
-                )}
-              </button>
+                <Card
+                  hoverable
+                  onClick={() => setActiveTab('ipv4')}
+                  style={{
+                    height: '100%',
+                    border: activeTab === 'ipv4' ? `2px solid ${token.colorPrimary}` : undefined,
+                    background: activeTab === 'ipv4' ? token.colorPrimaryBg : undefined,
+                  }}
+                >
+                  <Statistic
+                    title={
+                      <Space orientation="horizontal" size={6}>
+                        <CloudServerOutlined style={{ color: token.colorPrimary }} />
+                        <span>{t.countryExplorer.ipv4Allocations}</span>
+                      </Space>
+                    }
+                    value={data.ipv4Count}
+                    suffix={<span style={{ fontSize: 12, color: token.colorTextSecondary }}>{t.countryExplorer.prefixBlocks}</span>}
+                  />
+                </Card>
+              </BorderBeam>
+            </Col>
 
-              <button
-                type="button"
-                onClick={handleDownloadGenerated}
-                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+            <Col xs={24} sm={12} lg={6}>
+              <BorderBeam
+                size={120}
+                duration={6}
+                color={[
+                  { color: '#722ed1', percent: 0 },
+                  { color: '#eb2f96', percent: 50 },
+                  { color: '#f759ab', percent: 100 },
+                ]}
+                style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
               >
-                <Download className="w-4 h-4 text-emerald-400" />
-                <span>{t.countryExplorer.downloadScript}</span>
-              </button>
+                <Card
+                  hoverable
+                  onClick={() => setActiveTab('ipv6')}
+                  style={{
+                    height: '100%',
+                    border: activeTab === 'ipv6' ? `2px solid #722ed1` : undefined,
+                    background: activeTab === 'ipv6' ? '#f9f0ff' : undefined,
+                  }}
+                >
+                  <Statistic
+                    title={
+                      <Space orientation="horizontal" size={6}>
+                        <CloudServerOutlined style={{ color: '#722ed1' }} />
+                        <span>{t.countryExplorer.ipv6Allocations}</span>
+                      </Space>
+                    }
+                    value={data.ipv6Count}
+                    suffix={<span style={{ fontSize: 12, color: token.colorTextSecondary }}>{t.countryExplorer.nextGenPrefixes}</span>}
+                  />
+                </Card>
+              </BorderBeam>
+            </Col>
+
+            <Col xs={24} sm={12} lg={6}>
+              <BorderBeam
+                size={120}
+                duration={6}
+                color={[
+                  { color: '#fa8c16', percent: 0 },
+                  { color: '#faad14', percent: 50 },
+                  { color: '#ffd666', percent: 100 },
+                ]}
+                style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+              >
+                <Card
+                  hoverable
+                  onClick={() => setActiveTab('asns')}
+                  style={{
+                    height: '100%',
+                    border: activeTab === 'asns' ? `2px solid #fa8c16` : undefined,
+                    background: activeTab === 'asns' ? '#fff7e6' : undefined,
+                  }}
+                >
+                  <Statistic
+                    title={
+                      <Space orientation="horizontal" size={6}>
+                        <RadarChartOutlined style={{ color: '#fa8c16' }} />
+                        <span>{t.countryExplorer.originAsns}</span>
+                      </Space>
+                    }
+                    value={data.asnCount}
+                    suffix={<span style={{ fontSize: 12, color: token.colorTextSecondary }}>{t.countryExplorer.asNetworks}</span>}
+                  />
+                </Card>
+              </BorderBeam>
+            </Col>
+
+            <Col xs={24} sm={12} lg={6}>
+              <BorderBeam
+                size={120}
+                duration={6}
+                color={[
+                  { color: '#52c41a', percent: 0 },
+                  { color: '#13c2c2', percent: 50 },
+                  { color: '#95de64', percent: 100 },
+                ]}
+                style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+              >
+                <Card style={{ height: '100%' }}>
+                  <Statistic
+                    title={
+                      <Space orientation="horizontal" size={6}>
+                        <NumberOutlined style={{ color: '#52c41a' }} />
+                        <span>{t.countryExplorer.estCapacity}</span>
+                      </Space>
+                    }
+                    value={
+                      data.totalEstimatedIpv4Addresses > 1000000
+                        ? `${(data.totalEstimatedIpv4Addresses / 1000000).toFixed(1)}M`
+                        : data.totalEstimatedIpv4Addresses.toLocaleString()
+                    }
+                    suffix={<span style={{ fontSize: 12, color: token.colorTextSecondary }}>{t.countryExplorer.totalRouted}</span>}
+                  />
+                </Card>
+              </BorderBeam>
+            </Col>
+          </Row>
+        ) : null}
+
+        {error && (
+          <Alert
+            type="error"
+            showIcon
+            title={t.countryExplorer.loadError}
+            description={error}
+            action={
+              <Button size="small" danger icon={<ReloadOutlined />} onClick={() => fetchCountryData(selectedCountry)}>
+                {t.search.retry}
+              </Button>
+            }
+          />
+        )}
+
+        {/* Configuration Result Card (Moved to another card below Metrics Banner) */}
+        {generatedScript.text && (
+          <Card
+            title={
+              <Space orientation="horizontal" size={10} wrap>
+                <CodeOutlined style={{ color: token.colorPrimary, fontSize: 18 }} />
+                <span style={{ fontWeight: 700 }}>{t.countryExplorer.previewRules}</span>
+                <Tag color="blue" variant="filled">
+                  {generatedScript.ruleCount.toLocaleString()} {t.countryExplorer.rulesGenerated}
+                </Tag>
+                <Tag color="default" style={{ fontFamily: 'monospace' }}>
+                  {generatedScript.filename}
+                </Tag>
+              </Space>
+            }
+            extra={
+              <Space orientation="horizontal" size={8}>
+                <Button
+                  type="primary"
+                  icon={isConfigCopied ? <CheckOutlined /> : <CopyOutlined />}
+                  onClick={handleCopyGenerated}
+                >
+                  {isConfigCopied ? t.countryExplorer.copied : t.countryExplorer.copyScript}
+                </Button>
+                <Button icon={<DownloadOutlined />} onClick={handleDownloadGenerated}>
+                  {t.countryExplorer.downloadScript}
+                </Button>
+              </Space>
+            }
+          >
+            <div
+              style={{
+                background: token.colorFillAlter,
+                padding: 16,
+                borderRadius: token.borderRadiusLG,
+                border: `1px solid ${token.colorBorderSecondary}`,
+                maxHeight: 380,
+                overflowY: 'auto',
+                fontFamily: 'monospace',
+                fontSize: 12,
+                lineHeight: 1.6,
+              }}
+            >
+              <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: token.colorText }}>
+                {generatedScript.text}
+              </pre>
             </div>
-          </div>
+          </Card>
+        )}
 
-          {/* Syntax Preview Code Box */}
-          <div className="relative rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs text-slate-200 overflow-x-auto max-h-72 overflow-y-auto leading-relaxed selection:bg-cyan-500/40">
-            <pre className="whitespace-pre">{generatedScript.text}</pre>
-          </div>
-        </div>
-      )}
+        {/* Data Table Card */}
+        {data && (
+          <Card
+            title={
+              <Tabs
+                activeKey={activeTab}
+                onChange={(k) => {
+                  setActiveTab(k as TabType);
+                  setPage(1);
+                }}
+                items={[
+                  {
+                    key: 'ipv4',
+                    label: `${t.countryExplorer.ipv4Allocations} (${data.ipv4Count.toLocaleString()})`,
+                  },
+                  {
+                    key: 'ipv6',
+                    label: `${t.countryExplorer.ipv6Allocations} (${data.ipv6Count.toLocaleString()})`,
+                  },
+                  {
+                    key: 'asns',
+                    label: `${t.countryExplorer.originAsns} (${data.asnCount.toLocaleString()})`,
+                  },
+                ]}
+                style={{ marginBottom: 0 }}
+              />
+            }
+          >
+            {/* Filter controls */}
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
+              <Input
+                style={{ flex: 1, minWidth: 200 }}
+                prefix={<SearchOutlined style={{ color: token.colorTextSecondary }} />}
+                placeholder={t.countryExplorer.filterPlaceholder}
+                value={listSearch}
+                onChange={(e) => {
+                  setListSearch(e.target.value);
+                  setPage(1);
+                }}
+                allowClear
+              />
 
-
-
-      {/* Prefix Table & Explorer */}
-      {data && !isLoading && (
-        <div className="bg-slate-850 rounded-2xl border border-slate-800 overflow-hidden shadow-sm">
-
-          {/* Controls Bar */}
-          <div className="p-5 bg-slate-900/90 border-b border-slate-800 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-
-              {/* Type Switcher */}
-              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
-                <button
-                  onClick={() => {
-                    setActiveTab('ipv4');
+              {activeTab !== 'asns' && availableCidrs.length > 0 && (
+                <Select
+                  style={{ minWidth: 150 }}
+                  value={cidrFilter}
+                  onChange={(v) => {
+                    setCidrFilter(v);
                     setPage(1);
                   }}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${activeTab === 'ipv4'
-                    ? 'bg-cyan-600 text-white shadow-sm font-bold'
-                    : 'text-slate-400 hover:text-white'
-                    }`}
-                >
-                  <Network className="w-3.5 h-3.5" />
-                  <span>IPv4 ({data.ipv4Count})</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setActiveTab('ipv6');
-                    setPage(1);
-                  }}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${activeTab === 'ipv6'
-                    ? 'bg-indigo-600 text-white shadow-sm font-bold'
-                    : 'text-slate-400 hover:text-white'
-                    }`}
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  <span>IPv6 ({data.ipv6Count})</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setActiveTab('asns');
-                    setPage(1);
-                  }}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${activeTab === 'asns'
-                    ? 'bg-amber-600 text-white shadow-sm font-bold'
-                    : 'text-slate-400 hover:text-white'
-                    }`}
-                >
-                  <Radio className="w-3.5 h-3.5" />
-                  <span>ASNs ({data.asnCount})</span>
-                </button>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleCopyAllTable}
-                  className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
-                >
-                  {isTableCopied ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400">{t.common.copied}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>{t.countryExplorer.copyAll} ({filteredList.length})</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-            </div>
-
-            {/* Filter Search & Subnets */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
-              <div className="relative flex-1 max-w-md">
-                <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-                <input
-                  type="text"
-                  value={listSearch}
-                  onChange={e => {
-                    setListSearch(e.target.value);
-                    setPage(1);
-                  }}
-                  placeholder={t.countryExplorer.filterPlaceholder}
-                  className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
+                  options={[
+                    { value: 'all', label: `${t.countryExplorer.allCidrs} (${availableCidrs.reduce((a, b) => a + b[1], 0)})` },
+                    ...availableCidrs.map(([c, count]) => ({
+                      value: c,
+                      label: `/${c} (${count})`,
+                    })),
+                  ]}
                 />
-              </div>
-
-              {availableCidrs.length > 0 && activeTab !== 'asns' && (
-                <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] pb-1">
-                  <span className="text-slate-500 font-medium shrink-0">CIDR:</span>
-                  <button
-                    onClick={() => {
-                      setCidrFilter('all');
-                      setPage(1);
-                    }}
-                    className={`px-2.5 py-1 rounded-lg font-mono font-semibold transition-all ${cidrFilter === 'all'
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                      : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                      }`}
-                  >
-                    {t.countryExplorer.allCidrs}
-                  </button>
-                  {availableCidrs.slice(0, 6).map(([c, count]) => (
-                    <button
-                      key={c}
-                      onClick={() => {
-                        setCidrFilter(c);
-                        setPage(1);
-                      }}
-                      className={`px-2 py-1 rounded-lg font-mono transition-all flex items-center gap-1 ${cidrFilter === c
-                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold'
-                        : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                        }`}
-                    >
-                      <span>/{c}</span>
-                      <span className="text-[9px] text-slate-500">({count})</span>
-                    </button>
-                  ))}
-                </div>
               )}
             </div>
 
-          </div>
-
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs font-sans">
-              <thead className="bg-slate-900/60 text-slate-400 uppercase text-[10px] font-semibold tracking-wider border-b border-slate-800">
-                <tr>
-                  <th className="py-3 px-5">{t.countryExplorer.colIndex}</th>
-                  <th className="py-3 px-5">{t.countryExplorer.colResource}</th>
-                  <th className="py-3 px-5">{t.countryExplorer.colOrg}</th>
-                  {activeTab !== 'asns' && (
-                    <>
-                      <th className="py-3 px-5">{t.countryExplorer.colPrefixLen}</th>
-                      <th className="py-3 px-5">{t.countryExplorer.colCapacity}</th>
-                    </>
-                  )}
-                  <th className="py-3 px-5">{t.countryExplorer.colCountry}</th>
-                  <th className="py-3 px-5 text-right">{t.countryExplorer.colActions}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 font-mono">
-                {paginatedList.map((item, idx) => {
-                  const itemIndex = (page - 1) * itemsPerPage + idx + 1;
-                  const isIp = activeTab !== 'asns';
-                  const prefixLen = item.includes('/') ? `/${item.split('/')[1]}` : '-';
-                  const org = getOrgForItem(item);
-
-                  return (
-                    <tr key={idx} className="hover:bg-slate-800/40 transition-colors group">
-                      <td className="py-3 px-5 text-slate-500 text-[11px]">{itemIndex}</td>
-                      <td className="py-3 px-5 font-bold text-cyan-300">
-                        <div className="flex items-center gap-2">
-                          <span>{item}</span>
-                          <button
-                            onClick={() => handleCopySingle(item)}
-                            className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-200 transition-opacity"
-                            title={t.countryExplorer.copyPrefix}
-                          >
-                            {copiedItem === item ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-3 px-5 font-sans max-w-xs">
-                        {org ? (
-                          <div className="flex items-center gap-1.5" title={org}>
-                            <Building2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                            <span className="text-slate-200 font-medium truncate block max-w-[220px]">{org}</span>
-                          </div>
-                        ) : isResolvingOrgs ? (
-                          <span className="inline-flex items-center gap-1.5 text-slate-500 text-[11px]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
-                            <span>{t.countryExplorer.resolving}</span>
-                          </span>
-                        ) : (
-                          <span className="text-slate-500 text-[11px] font-mono">{t.countryExplorer.unknownOrg}</span>
-                        )}
-                      </td>
-                      {isIp && (
-                        <>
-                          <td className="py-3 px-5">
-                            <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800 text-[11px]">
-                              {prefixLen}
-                            </span>
-                          </td>
-                          <td className="py-3 px-5 text-slate-300">
-                            {activeTab === 'ipv4' ? (
-                              <span className="text-emerald-400 font-semibold">
-                                {calculateIpv4HostCount(item)} {t.countryExplorer.addresses}
-                              </span>
-                            ) : (
-                              <span className="text-indigo-300">{t.countryExplorer.ipv6Block}</span>
-                            )}
-                          </td>
-                        </>
-                      )}
-                      <td className="py-3 px-5 font-sans">
-                        <span className="flex items-center gap-1.5 text-slate-300">
-                          <FlagIcon code={data.countryCode} className="w-4 h-3 rounded-[2px]" />
-                          <span className="font-mono text-xs">{data.countryName}</span>
-                        </span>
-                      </td>
-                      <td className="py-3 px-5 text-right font-sans">
-                        <button
-                          onClick={() => onInspectResource(item)}
-                          className="px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-200 text-xs font-semibold inline-flex items-center gap-1 transition-colors"
-                          title={t.countryExplorer.openWhoisTooltip}
-                        >
-                          <span>{t.countryExplorer.openWhois}</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-
-                {paginatedList.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-500 text-xs font-sans">
-                      {t.countryExplorer.noPrefixesFound}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="p-4 bg-slate-900/60 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-              <span>
-                {t.common.page} <strong className="text-white font-mono">{page}</strong> {t.common.of} <strong className="text-white font-mono">{totalPages}</strong> ({filteredList.length.toLocaleString()} {t.common.items})
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-800 text-white rounded-lg transition-colors font-medium"
-                >
-                  {t.common.previous}
-                </button>
-                <button
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-800 text-white rounded-lg transition-colors font-medium"
-                >
-                  {t.common.next}
-                </button>
-              </div>
-            </div>
-          )}
-
-        </div>
-      )}
-
+            <Table
+              size="middle"
+              columns={tableColumns}
+              dataSource={paginatedList.map((item) => ({ item }))}
+              rowKey="item"
+              pagination={{
+                current: page,
+                pageSize: itemsPerPage,
+                total: filteredList.length,
+                onChange: setPage,
+                showSizeChanger: false,
+              }}
+            />
+          </Card>
+        )}
+      </Space>
     </div>
   );
 };

@@ -37,7 +37,7 @@ A self-hosted, open-source network intelligence platform powered by **RIPE NCC**
 | 🧱 **Firewall Rule Generator** | Export IP lists as **MikroTik** address-lists, **Cisco ACL**, **.htaccess**, **iptables**, or **FreeBSD PF** rules |
 | 📦 **Batch Inspector** | Query up to 50 IPs/ASNs at once with CSV/JSON export |
 | 🧮 **Subnet Calculator** | Compute network range, broadcast, subnet mask, wildcard, and binary breakdown |
-| 🌐 **Multi Language** | Full English and Persian (فارسی) interface with RTL support |
+| 🌐 **Multi Language** | Full English and Persian interface with RTL support |
 | ⚡ **Redis Caching** | Smart caching layer for fast repeat queries and reduced upstream load |
 | 🔌 **Plugin System** | Dynamic Go plugin architecture for custom firewall output formats |
 | 📖 **OpenAPI 3.1 & Docs** | Interactive documentation at `/docs` (Stoplight Elements), OpenAPI 3.1 specs (`/openapi.json`, `/openapi.yaml`), and RFC 9727 API catalog (`/.well-known/api-catalog`) |
@@ -330,7 +330,7 @@ go run .
 IP-Hub ships with full support for:
 
 - 🇬🇧 **English** — Default language
-- 🇮🇷 **فارسی (Persian)** — Complete RTL layout with localized strings
+- 🇮🇷 **Persian** — Complete RTL layout with localized strings
 
 Language can be toggled from the settings modal in the UI.
 

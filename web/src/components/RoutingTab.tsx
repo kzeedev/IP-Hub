@@ -1,7 +1,17 @@
 import React from 'react';
+import { Card, Row, Col, Progress, Tag, Button, Typography, Space, theme } from 'antd';
+import {
+  RadarChartOutlined,
+  GlobalOutlined,
+  ShareAltOutlined,
+  SafetyCertificateOutlined,
+  ArrowRightOutlined,
+  CheckCircleOutlined,
+} from '@ant-design/icons';
 import { RoutingStatus } from '../types';
-import { Radio, ShieldCheck, Globe, Activity, ExternalLink, CheckCircle2, Share2 } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
+
+const { Title, Text, Paragraph } = Typography;
 
 interface RoutingTabProps {
   routing: RoutingStatus;
@@ -11,125 +21,148 @@ interface RoutingTabProps {
 
 export const RoutingTab: React.FC<RoutingTabProps> = ({ routing, cidr, onSearchResource }) => {
   const { t } = useLanguage();
+  const { token } = theme.useToken();
   const visPercent = routing?.bgpVisibilityPercentage || 0;
 
   return (
-    <div className="space-y-6">
-      
-      {/* Top Routing Status Banner */}
-      <div className="bg-slate-850 rounded-2xl border border-slate-800 p-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-              routing?.isAnnounced ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-            }`}>
-              <Radio className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-white">{t.routingTab.routingStatus}</h3>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
-                  routing?.isAnnounced ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                }`}>
-                  {routing?.isAnnounced ? t.routingTab.globallyRouted : t.routingTab.unannounced}
-                </span>
+    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+      {/* Top Routing Status Card */}
+      <Card
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, padding: '6px 0' }}>
+            <Space orientation="horizontal" size={10}>
+              <RadarChartOutlined style={{ color: routing?.isAnnounced ? '#52c41a' : '#faad14', fontSize: 20 }} />
+              <div>
+                <Space orientation="horizontal" size={8} align="center">
+                  <span style={{ fontWeight: 700, fontSize: 16 }}>{t.routingTab.routingStatus}</span>
+                  <Tag color={routing?.isAnnounced ? 'success' : 'warning'} variant="filled">
+                    {routing?.isAnnounced ? t.routingTab.globallyRouted : t.routingTab.unannounced}
+                  </Tag>
+                </Space>
+                <div style={{ fontSize: 12, color: token.colorTextSecondary, fontWeight: 400 }}>
+                  {t.routingTab.risDescription}
+                </div>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {t.routingTab.risDescription}
-              </p>
-            </div>
+            </Space>
+
+            {routing?.originAsn && routing.originAsn !== 'Unrouted' && (
+              <Button
+                type="primary"
+                ghost
+                icon={<ArrowRightOutlined />}
+                style={{ fontFamily: 'monospace' }}
+                onClick={() => onSearchResource(routing.originAsn)}
+              >
+                {t.routingTab.originButton} {routing.originAsn}
+              </Button>
+            )}
           </div>
-
-          {routing?.originAsn && routing.originAsn !== 'Unrouted' && (
-            <button
-              onClick={() => onSearchResource(routing.originAsn)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-mono text-sm font-bold transition-all"
-            >
-              <span>{t.routingTab.originButton} {routing.originAsn}</span>
-              <ExternalLink className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-
-        {/* Metrics Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-6">
-          
-          <div className="bg-slate-900/60 rounded-xl p-4 border border-slate-800/80">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-              <span>{t.routingTab.bgpVisibility}</span>
-              <Activity className="w-4 h-4 text-cyan-400" />
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-white">{visPercent}%</span>
-              <span className="text-xs text-slate-400">{t.routingTab.acrossRis}</span>
-            </div>
-            {/* Progress bar */}
-            <div className="w-full bg-slate-800 rounded-full h-2 mt-3 overflow-hidden">
-              <div
-                className={`h-full rounded-full ${
-                  visPercent > 80 ? 'bg-emerald-500' : visPercent > 30 ? 'bg-amber-500' : 'bg-slate-600'
-                }`}
-                style={{ width: `${Math.max(visPercent, 3)}%` }}
+        }
+      >
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={8}>
+            <Card type="inner" size="small">
+              <Text type="secondary" style={{ fontSize: 12 }}>{t.routingTab.bgpVisibility}</Text>
+              <div style={{ fontSize: 24, fontWeight: 700, margin: '8px 0', fontFamily: 'monospace' }}>
+                {visPercent}%
+                <Text type="secondary" style={{ fontSize: 12, marginInlineStart: 6, fontWeight: 400 }}>
+                  {t.routingTab.acrossRis}
+                </Text>
+              </div>
+              <Progress
+                percent={visPercent}
+                size="small"
+                status={visPercent > 80 ? 'success' : visPercent > 30 ? 'normal' : 'exception'}
+                showInfo={false}
               />
-            </div>
-          </div>
+            </Card>
+          </Col>
 
-          <div className="bg-slate-900/60 rounded-xl p-4 border border-slate-800/80">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-              <span>{t.routingTab.peerSightings}</span>
-              <Globe className="w-4 h-4 text-indigo-400" />
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-white">{routing?.risPeersSeen || 0}</span>
-              <span className="text-xs text-slate-400">/ {routing?.totalRisPeers || '600+'} {t.routingTab.peers}</span>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-2">{t.routingTab.activeFeeds}</p>
-          </div>
+          <Col xs={24} sm={8}>
+            <Card type="inner" size="small">
+              <Space orientation="horizontal" size={6}>
+                <GlobalOutlined style={{ color: token.colorPrimary }} />
+                <Text type="secondary" style={{ fontSize: 12 }}>{t.routingTab.peerSightings}</Text>
+              </Space>
+              <div style={{ fontSize: 24, fontWeight: 700, margin: '8px 0', fontFamily: 'monospace' }}>
+                {routing?.risPeersSeen || 0}
+                <Text type="secondary" style={{ fontSize: 12, marginInlineStart: 6, fontWeight: 400 }}>
+                  / {routing?.totalRisPeers || '600+'} {t.routingTab.peers}
+                </Text>
+              </div>
+              <Text type="secondary" style={{ fontSize: 11 }}>{t.routingTab.activeFeeds}</Text>
+            </Card>
+          </Col>
 
-          <div className="bg-slate-900/60 rounded-xl p-4 border border-slate-800/80">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-              <span>{t.routingTab.announcedPrefix}</span>
-              <Share2 className="w-4 h-4 text-emerald-400" />
-            </div>
-            <span className="text-base font-mono font-bold text-emerald-300 truncate block" title={routing?.announcedPrefix || cidr}>
-              {routing?.announcedPrefix || cidr}
-            </span>
-            <p className="text-[11px] text-slate-500 mt-2">{t.routingTab.originAnnouncement}</p>
-          </div>
-
-        </div>
-      </div>
+          <Col xs={24} sm={8}>
+            <Card type="inner" size="small">
+              <Space orientation="horizontal" size={6}>
+                <ShareAltOutlined style={{ color: '#52c41a' }} />
+                <Text type="secondary" style={{ fontSize: 12 }}>{t.routingTab.announcedPrefix}</Text>
+              </Space>
+              <Paragraph
+                copyable={{ text: routing?.announcedPrefix || cidr }}
+                style={{ fontSize: 16, fontWeight: 700, margin: '12px 0 6px', fontFamily: 'monospace' }}
+              >
+                {routing?.announcedPrefix || cidr}
+              </Paragraph>
+              <Text type="secondary" style={{ fontSize: 11 }}>{t.routingTab.originAnnouncement}</Text>
+            </Card>
+          </Col>
+        </Row>
+      </Card>
 
       {/* RPKI & Route Object Details */}
-      <div className="bg-slate-850 rounded-2xl border border-slate-800 p-6">
-        <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" />
-          {t.routingTab.roaTitle}
-        </h3>
-
-        <div className="space-y-3 text-xs text-slate-300">
-          <div className="flex items-start gap-3 p-3.5 bg-slate-900/80 rounded-xl border border-slate-800">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+      <Card
+        title={
+          <Space orientation="horizontal" size={8}>
+            <SafetyCertificateOutlined style={{ color: '#52c41a' }} />
+            <span>{t.routingTab.roaTitle}</span>
+          </Space>
+        }
+      >
+        <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+          <div
+            style={{
+              padding: 12,
+              borderRadius: token.borderRadiusLG,
+              background: token.colorFillAlter,
+              border: `1px solid ${token.colorBorderSecondary}`,
+              display: 'flex',
+              gap: 12,
+              alignItems: 'flex-start',
+            }}
+          >
+            <CheckCircleOutlined style={{ color: '#52c41a', marginTop: 3 }} />
             <div>
-              <span className="font-semibold text-white block">{t.routingTab.irrTitle}</span>
-              <p className="text-slate-400 mt-0.5">
+              <Text strong>{t.routingTab.irrTitle}</Text>
+              <Paragraph type="secondary" style={{ margin: 0, fontSize: 12 }}>
                 {t.routingTab.irrDesc} {cidr}.
-              </p>
+              </Paragraph>
             </div>
           </div>
 
-          <div className="flex items-start gap-3 p-3.5 bg-slate-900/80 rounded-xl border border-slate-800">
-            <Radio className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+          <div
+            style={{
+              padding: 12,
+              borderRadius: token.borderRadiusLG,
+              background: token.colorFillAlter,
+              border: `1px solid ${token.colorBorderSecondary}`,
+              display: 'flex',
+              gap: 12,
+              alignItems: 'flex-start',
+            }}
+          >
+            <RadarChartOutlined style={{ color: token.colorPrimary, marginTop: 3 }} />
             <div>
-              <span className="font-semibold text-white block">{t.routingTab.risCoverageTitle}</span>
-              <p className="text-slate-400 mt-0.5">
+              <Text strong>{t.routingTab.risCoverageTitle}</Text>
+              <Paragraph type="secondary" style={{ margin: 0, fontSize: 12 }}>
                 {t.routingTab.risCoverageDesc}
-              </p>
+              </Paragraph>
             </div>
           </div>
-        </div>
-      </div>
-
-    </div>
+        </Space>
+      </Card>
+    </Space>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Globe } from 'lucide-react';
+import { GlobalOutlined } from '@ant-design/icons';
 
 interface FlagIconProps {
   code?: string;
@@ -21,7 +21,7 @@ export const FlagIcon: React.FC<FlagIconProps> = ({
   const cleanCode = code ? code.trim().toLowerCase() : '';
 
   if (!cleanCode || cleanCode.length !== 2 || cleanCode === 'xx' || hasError) {
-    return <Globe className={`inline-block align-middle text-slate-400 shrink-0 ${className}`} />;
+    return <GlobalOutlined className={`inline-block align-middle shrink-0 ${className}`} />;
   }
 
   return (
@@ -33,7 +33,7 @@ export const FlagIcon: React.FC<FlagIconProps> = ({
       loading={loading}
       decoding="async"
       onError={() => setHasError(true)}
-      className={`inline-block align-middle object-cover rounded-xs shrink-0 shadow-xs aspect-[4/3] ${className}`}
+      className={`inline-block align-middle object-cover rounded-xs shrink-0 aspect-[4/3] ${className}`}
       title={cleanCode.toUpperCase()}
     />
   );

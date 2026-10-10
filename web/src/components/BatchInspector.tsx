@@ -1,11 +1,20 @@
-import React, { useState, useRef } from 'react';
-import { ListPlus, Play, Download, Trash2, ExternalLink } from 'lucide-react';
+import React, { useState } from 'react';
+import { Card, Input, Button, Table, Space, Typography, Tag, Alert, theme } from 'antd';
+import {
+  UnorderedListOutlined,
+  PlayCircleOutlined,
+  DownloadOutlined,
+  DeleteOutlined,
+  LinkOutlined,
+} from '@ant-design/icons';
 import { BatchLookupItemResult } from '../types';
 import { downloadText } from '../utils/helpers';
 import { getCountryName } from '../utils/countries';
 import { getRouteUrl } from '../utils/router';
 import { FlagIcon } from './FlagIcon';
 import { useLanguage } from '../i18n/LanguageContext';
+
+const { Title, Text, Paragraph } = Typography;
 
 interface BatchInspectorProps {
   onInspectSingle: (query: string) => void;
@@ -21,6 +30,7 @@ const DEFAULT_BATCH = `193.0.6.139
 
 export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle }) => {
   const { language, t } = useLanguage();
+  const { token } = theme.useToken();
   const [inputText, setInputText] = useState(DEFAULT_BATCH);
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<BatchLookupItemResult[]>([]);
@@ -29,7 +39,7 @@ export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle 
   const handleRunBatch = async () => {
     const lines = inputText
       .split('\n')
-      .map(l => l.trim())
+      .map((l) => l.trim())
       .filter(Boolean);
 
     if (lines.length === 0) return;
@@ -63,7 +73,7 @@ export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle 
   const handleExportCsv = () => {
     if (results.length === 0) return;
     const headers = ['Query', 'Status', 'IP Version', 'Network Name', 'Range', 'Country', 'Origin AS', 'Abuse Email'];
-    const rows = results.map(r => [
+    const rows = results.map((r) => [
       `"${r.query}"`,
       `"${r.status}"`,
       `"${r.ipVersion || ''}"`,
@@ -73,7 +83,7 @@ export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle 
       `"${r.originAsn || ''}"`,
       `"${r.abuseEmail || ''}"`,
     ]);
-    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     downloadText('ripe_batch_whois_results.csv', csvContent);
   };
 
@@ -82,168 +92,200 @@ export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle 
     downloadText('ripe_batch_whois_results.json', JSON.stringify(results, null, 2));
   };
 
-  return (
-    <div className="space-y-6 max-w-6xl mx-auto py-6 px-4">
-      
-      {/* Header Banner */}
-      <div className="bg-slate-850 rounded-2xl border border-slate-800 p-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center">
-            <ListPlus className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">{t.batch.title}</h1>
-            <p className="text-xs text-slate-400">
-              {t.batch.description}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Input Area */}
-      <div className="bg-slate-850 rounded-2xl border border-slate-800 p-6">
-        <div className="flex items-center justify-between mb-3">
-          <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-            {t.batch.inputPlaceholder}
-          </label>
-          <button
-            onClick={() => setInputText('')}
-            className="text-xs text-slate-400 hover:text-red-400 flex items-center gap-1"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            {t.batch.clearButton}
-          </button>
-        </div>
-
-        <textarea
-          rows={6}
-          value={inputText}
-          onChange={e => setInputText(e.target.value)}
-          placeholder="Paste IP addresses or CIDR prefixes here (e.g. 1.1.1.1, 8.8.8.8, 193.0.0.0/21)..."
-          className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl text-xs sm:text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 leading-relaxed"
+  const columns = [
+    {
+      title: t.batch.colTarget,
+      dataIndex: 'query',
+      key: 'query',
+      render: (text: string) => (
+        <Text strong style={{ fontFamily: 'monospace', color: token.colorPrimary }}>
+          {text}
+        </Text>
+      ),
+    },
+    {
+      title: t.batch.colNetname,
+      dataIndex: 'netname',
+      key: 'netname',
+      render: (text: string) => text || <Text type="secondary" italic>{t.common.unknown}</Text>,
+    },
+    {
+      title: t.batch.colRange,
+      dataIndex: 'range',
+      key: 'range',
+      render: (text: string) => (
+        <Text style={{ fontFamily: 'monospace', fontSize: 12 }}>{text || '-'}</Text>
+      ),
+    },
+    {
+      title: t.batch.colOrigin,
+      dataIndex: 'originAsn',
+      key: 'originAsn',
+      render: (text: string) => (
+        <Text style={{ fontFamily: 'monospace', color: '#fa8c16' }}>{text || '-'}</Text>
+      ),
+    },
+    {
+      title: t.batch.colCountry,
+      dataIndex: 'countryCode',
+      key: 'countryCode',
+      render: (cCode: string) => (
+        <Space orientation="horizontal" size={6} align="center">
+          <FlagIcon code={cCode} className="w-4 h-3 rounded-[2px]" />
+          <Text code style={{ margin: 0 }}>{cCode || '-'}</Text>
+          {cCode && (
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              ({getCountryName(cCode, language)})
+            </Text>
+          )}
+        </Space>
+      ),
+    },
+    {
+      title: t.batch.colAbuse,
+      dataIndex: 'abuseEmail',
+      key: 'abuseEmail',
+      render: (text: string) => (
+        <Text style={{ fontFamily: 'monospace', fontSize: 12 }} ellipsis={{ tooltip: text }}>
+          {text || '-'}
+        </Text>
+      ),
+    },
+    {
+      title: t.batch.colActions,
+      key: 'actions',
+      align: 'right' as const,
+      render: (_: any, record: BatchLookupItemResult) => (
+        <Button
+          type="link"
+          size="small"
+          icon={<LinkOutlined />}
+          href={getRouteUrl('lookup', { query: record.query, lang: language })}
+          onClick={(e) => {
+            if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+              e.preventDefault();
+              onInspectSingle(record.query);
+            }
+          }}
+          title={t.batch.openWhoisTooltip}
         />
+      ),
+    },
+  ];
 
-
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <span className="text-xs text-slate-400">
-            {inputText.split('\n').filter(l => l.trim()).length} {t.batch.targetsQueued}
-          </span>
-
-          <button
-            onClick={handleRunBatch}
-            disabled={isLoading || !inputText.trim()}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-cyan-600/20 disabled:opacity-50 transition-all active:scale-95"
-          >
-            {isLoading ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <Play className="w-4 h-4 fill-white" />
-            )}
-            <span>{isLoading ? t.batch.analyzing : t.batch.analyzeButton}</span>
-          </button>
-        </div>
-
-        {error && (
-          <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-300">
-            {error}
-          </div>
-        )}
-      </div>
-
-      {/* Results Table */}
-      {results.length > 0 && (
-        <div className="bg-slate-850 rounded-2xl border border-slate-800 overflow-hidden shadow-sm">
-          
-          <div className="p-4 bg-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-sm font-bold text-white">
-              {t.batch.resultsTitle} ({results.length} {t.batch.processed})
-            </h3>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExportCsv}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-              >
-                <Download className="w-3.5 h-3.5 text-cyan-400" />
-                <span>{t.batch.exportCsv}</span>
-              </button>
-              <button
-                onClick={handleExportJson}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-              >
-                <Download className="w-3.5 h-3.5 text-indigo-400" />
-                <span>{t.batch.exportJson}</span>
-              </button>
+  return (
+    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px' }}>
+      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+        {/* Header */}
+        <Card>
+          <Space orientation="horizontal" size={12} align="center">
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: token.borderRadiusLG,
+                background: token.colorPrimaryBg,
+                color: token.colorPrimary,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 22,
+              }}
+            >
+              <UnorderedListOutlined />
             </div>
+            <div>
+              <Title level={3} style={{ margin: 0, fontWeight: 800 }}>
+                {t.batch.title}
+              </Title>
+              <Paragraph type="secondary" style={{ margin: 0, fontSize: 13 }}>
+                {t.batch.description}
+              </Paragraph>
+            </div>
+          </Space>
+        </Card>
+
+        {/* Input Card */}
+        <Card
+          title={t.batch.inputPlaceholder}
+          extra={
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => setInputText('')}
+            >
+              {t.batch.clearButton}
+            </Button>
+          }
+        >
+          <Input.TextArea
+            rows={6}
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder="Paste IP addresses or CIDR prefixes here (e.g. 1.1.1.1, 8.8.8.8, 193.0.0.0/21)..."
+            style={{ fontFamily: 'monospace', fontSize: 13 }}
+          />
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {inputText.split('\n').filter((l) => l.trim()).length} {t.batch.targetsQueued}
+            </Text>
+
+            <Button
+              type="primary"
+              size="large"
+              icon={<PlayCircleOutlined />}
+              loading={isLoading}
+              disabled={!inputText.trim()}
+              onClick={handleRunBatch}
+            >
+              {isLoading ? t.batch.analyzing : t.batch.analyzeButton}
+            </Button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs font-sans">
-              <thead className="bg-slate-900/60 text-slate-400 uppercase text-[10px] font-semibold tracking-wider border-b border-slate-800">
-                <tr>
-                  <th className="py-3 px-4">{t.batch.colTarget}</th>
-                  <th className="py-3 px-4">{t.batch.colNetname}</th>
-                  <th className="py-3 px-4">{t.batch.colRange}</th>
-                  <th className="py-3 px-4">{t.batch.colOrigin}</th>
-                  <th className="py-3 px-4">{t.batch.colCountry}</th>
-                  <th className="py-3 px-4">{t.batch.colAbuse}</th>
-                  <th className="py-3 px-4 text-right">{t.batch.colActions}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {results.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="py-3 px-4 font-mono font-bold text-cyan-300">
-                      {row.query}
-                    </td>
-                    <td className="py-3 px-4 text-slate-200 font-semibold truncate max-w-[160px]">
-                      {row.netname || <span className="text-slate-500 italic">{t.common.unknown}</span>}
-                    </td>
-                    <td className="py-3 px-4 font-mono text-slate-400 truncate max-w-[140px]">
-                      {row.range || '-'}
-                    </td>
-                    <td className="py-3 px-4 font-mono text-amber-300">
-                      {row.originAsn || '-'}
-                    </td>
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <span className="flex items-center gap-1.5 text-slate-300" title={getCountryName(row.countryCode, language)}>
-                        <FlagIcon code={row.countryCode} className="w-4 h-3" />
-                        <span className="font-mono text-[11px]">{row.countryCode || '-'}</span>
-                        {row.countryCode && (
-                          <span className="text-[10px] text-slate-400 font-sans hidden md:inline">
-                            ({getCountryName(row.countryCode, language)})
-                          </span>
-                        )}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 font-mono text-slate-400 truncate max-w-[150px]">
-                      {row.abuseEmail || '-'}
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <a
-                        href={getRouteUrl('lookup', { query: row.query, lang: language })}
-                        hrefLang={language}
-                        onClick={(e) => {
-                          if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
-                            e.preventDefault();
-                            onInspectSingle(row.query);
-                          }
-                        }}
-                        className="inline-flex p-1 text-cyan-400 hover:text-cyan-200 hover:bg-cyan-500/10 rounded transition-colors cursor-pointer"
-                        title={t.batch.openWhoisTooltip}
-                      >
-                        <ExternalLink className="w-4 h-4 ml-auto" />
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {error && (
+            <Alert
+              type="error"
+              showIcon
+              title={error}
+              style={{ marginTop: 16 }}
+            />
+          )}
+        </Card>
 
-        </div>
-      )}
-
+        {/* Results Card */}
+        {results.length > 0 && (
+          <Card
+            title={
+              <Space orientation="horizontal" size={8}>
+                <span>
+                  {t.batch.resultsTitle} ({results.length} {t.batch.processed})
+                </span>
+              </Space>
+            }
+            extra={
+              <Space orientation="horizontal" size={8}>
+                <Button icon={<DownloadOutlined />} onClick={handleExportCsv}>
+                  {t.batch.exportCsv}
+                </Button>
+                <Button icon={<DownloadOutlined />} onClick={handleExportJson}>
+                  {t.batch.exportJson}
+                </Button>
+              </Space>
+            }
+            styles={{ body: { padding: 0 } }}
+          >
+            <Table
+              size="middle"
+              columns={columns}
+              dataSource={results}
+              rowKey="query"
+              pagination={{ pageSize: 15 }}
+            />
+          </Card>
+        )}
+      </Space>
     </div>
   );
 };

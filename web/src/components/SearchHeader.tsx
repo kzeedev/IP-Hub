@@ -1,7 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Search, Sparkles, ArrowRight, X, History, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Input, Typography, Tag, Space, Button, Popover, theme } from 'antd';
+import {
+  SearchOutlined,
+  HistoryOutlined,
+  DeleteOutlined,
+  ThunderboltOutlined,
+} from '@ant-design/icons';
 import { SearchHistoryItem } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
+
+const { Title, Paragraph, Text } = Typography;
 
 interface SearchHeaderProps {
   query: string;
@@ -30,195 +38,202 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
   onClearHistory,
 }) => {
   const { t } = useLanguage();
-  const [showHistory, setShowHistory] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
+  const { token } = theme.useToken();
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (formRef.current && !formRef.current.contains(event.target as Node)) {
-        setShowHistory(false);
-      }
-    };
-
-    if (showHistory) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
-    };
-  }, [showHistory]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (query.trim()) {
-      setShowHistory(false);
-      onSearch(query.trim());
+  const handleSearchSubmit = (val: string) => {
+    const trimmed = val.trim();
+    if (trimmed) {
+      setIsHistoryOpen(false);
+      onSearch(trimmed);
     }
   };
 
   const getQueryTypeHint = (val: string) => {
     const v = val.trim();
     if (!v) return null;
-    if (v.toUpperCase().startsWith('AS') || /^\d{2,6}$/.test(v)) return { type: 'ASN', color: 'text-amber-400 border-amber-500/30 bg-amber-500/10' };
-    if (v.includes('/')) return { type: t.search.typeCidr, color: 'text-indigo-400 border-indigo-500/30 bg-indigo-500/10' };
-    if (v.includes(':')) return { type: 'IPv6', color: 'text-purple-400 border-purple-500/30 bg-purple-500/10' };
-    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(v)) return { type: 'IPv4', color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' };
-    return { type: t.search.typeQuery, color: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/10' };
+    if (v.toUpperCase().startsWith('AS') || /^\d{2,6}$/.test(v)) return { type: 'ASN', color: 'gold' };
+    if (v.includes('/')) return { type: t.search.typeCidr, color: 'blue' };
+    if (v.includes(':')) return { type: 'IPv6', color: 'purple' };
+    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(v)) return { type: 'IPv4', color: 'green' };
+    return { type: t.search.typeQuery, color: 'cyan' };
   };
 
   const typeHint = getQueryTypeHint(query);
 
-  return (
-    <div className="w-full bg-slate-900 border-b border-slate-800/80 py-5 sm:py-8 px-3 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
+  const historyContent = (
+    <div style={{ minWidth: 340, maxWidth: 480, maxHeight: 350, overflowY: 'auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, whiteSpace: 'nowrap' }}>
+        <Text strong style={{ fontSize: 13, whiteSpace: 'nowrap' }}>
+          {t.search.historyTitle}
+        </Text>
+        <Button
+          type="text"
+          danger
+          size="small"
+          icon={<DeleteOutlined />}
+          onClick={onClearHistory}
+          style={{ whiteSpace: 'nowrap' }}
+        >
+          {t.search.clearHistory}
+        </Button>
+      </div>
+      {history.length === 0 ? (
+        <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+          No recent searches
+        </Text>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {history.map((item, idx) => (
+            <div
+              key={idx}
+              style={{
+                cursor: 'pointer',
+                padding: '6px 10px',
+                borderRadius: token.borderRadiusSM,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 12,
+                whiteSpace: 'nowrap',
+                transition: 'background 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = token.colorFillTertiary;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
+              onClick={() => {
+                setQuery(item.query);
+                setIsHistoryOpen(false);
+                onSearch(item.query);
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  minWidth: 0,
+                  flex: 1,
+                }}
+              >
+                <Text code style={{ margin: 0, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {item.query}
+                </Text>
+                {item.netname && (
+                  <Text
+                    type="secondary"
+                    style={{
+                      fontSize: 11,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                    title={item.netname}
+                  >
+                    ({item.netname})
+                  </Text>
+                )}
+              </div>
+              <Tag
+                color={item.type === 'asn' ? 'gold' : item.type === 'prefix' ? 'blue' : 'default'}
+                variant="filled"
+                style={{ margin: 0, fontSize: 10, flexShrink: 0, whiteSpace: 'nowrap' }}
+              >
+                {item.type?.toUpperCase()}
+              </Tag>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
-        {/* Main SEO Title & Subtitle */}
-        <div className="text-center mb-4 sm:mb-6">
-          <h1 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
-            {t.search.title}
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl mx-auto">
-            {t.search.subtitle}
-          </p>
+  return (
+    <div
+      style={{
+        background: token.colorBgContainer,
+        borderBottom: `1px solid ${token.colorBorderSecondary}`,
+        padding: '32px 16px',
+      }}
+    >
+      <div style={{ maxWidth: 840, margin: '0 auto', textAlign: 'center' }}>
+        <Title level={2} style={{ margin: 0, fontWeight: 800 }}>
+          {t.search.title}
+        </Title>
+        <Paragraph type="secondary" style={{ marginTop: 6, marginBottom: 24, fontSize: 14 }}>
+          {t.search.subtitle}
+        </Paragraph>
+
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Input.Search
+            id="whois-search-input"
+            size="large"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t.search.placeholder}
+            enterButton={t.search.button}
+            loading={isLoading}
+            allowClear
+            prefix={<SearchOutlined style={{ color: token.colorTextSecondary }} />}
+            suffix={
+              typeHint ? (
+                <Tag color={typeHint.color} variant="filled" style={{ marginInlineEnd: 4 }}>
+                  {typeHint.type}
+                </Tag>
+              ) : undefined
+            }
+            onSearch={handleSearchSubmit}
+          />
+
+          {history.length > 0 && (
+            <Popover
+              open={isHistoryOpen}
+              onOpenChange={setIsHistoryOpen}
+              content={historyContent}
+              trigger="click"
+              placement="bottomRight"
+            >
+              <Button
+                size="large"
+                icon={<HistoryOutlined />}
+                title={t.search.historyTitle}
+                aria-label={t.search.historyTitle}
+              />
+            </Popover>
+          )}
         </div>
 
-        {/* Main Search Input Form */}
-        <form ref={formRef} onSubmit={handleSubmit} className="relative">
-          <div className="relative flex items-center shadow-2xl rounded-2xl overflow-hidden border border-slate-700 bg-slate-800/90 focus-within:border-cyan-500 focus-within:ring-2 focus-within:ring-cyan-500/20 transition-all">
-
-            <div className="pl-3 sm:pl-4 pr-1 text-slate-400 flex items-center shrink-0">
-              <Search className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
-            </div>
-
-            <input
-              id="whois-search-input"
-              type="text"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              onFocus={() => setShowHistory(true)}
-              placeholder={t.search.placeholder}
-              autoComplete="off"
-              className="w-full py-3 sm:py-4 px-2 text-xs sm:text-base bg-transparent text-white placeholder-slate-400 focus:outline-none font-mono"
-            />
-
-            {/* Type Hint Badge */}
-            {typeHint && (
-              <div className="hidden sm:flex items-center mx-1 sm:mx-2 shrink-0">
-                <span className={`text-[10px] sm:text-[11px] font-mono px-2 py-0.5 rounded border ${typeHint.color}`}>
-                  {typeHint.type}
-                </span>
-              </div>
-            )}
-
-            {/* Clear button */}
-            {query && (
-              <button
-                type="button"
-                onClick={() => setQuery('')}
-                className="p-1 sm:p-1.5 text-slate-400 hover:text-white mx-0.5 sm:mx-1 shrink-0"
-              >
-                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              </button>
-            )}
-
-            {/* Submit button */}
-            <button
-              id="btn-search-submit"
-              type="submit"
-              disabled={isLoading || !query.trim()}
-              className="m-1 sm:m-1.5 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold text-xs sm:text-sm flex items-center gap-1 sm:gap-1.5 shadow-md shadow-cyan-600/30 active:scale-95 transition-all disabled:opacity-50 shrink-0"
-            >
-              {isLoading ? (
-                <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <span className="hidden xs:inline">{t.search.button}</span>
-                  <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 rtl:rotate-180" />
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Search History Dropdown */}
-          {showHistory && history.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-slate-800/95 border border-slate-700 rounded-xl shadow-2xl z-40 p-2 backdrop-blur-md">
-              <div className="flex items-center justify-between px-3 py-1.5 text-xs text-slate-400 border-b border-slate-700/60 mb-1">
-                <span className="flex items-center gap-1.5 font-semibold text-slate-300">
-                  <History className="w-3.5 h-3.5 text-cyan-400" />
-                  {t.search.historyTitle}
-                </span>
-                <div className="flex items-center gap-2.5">
-                  <button
-                    type="button"
-                    onClick={onClearHistory}
-                    className="flex items-center gap-1 text-[11px] text-red-400 hover:text-red-300 transition-colors"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    {t.search.clearHistory}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowHistory(false)}
-                    className="p-1 rounded-md hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
-                    title="Close"
-                    aria-label="Close history"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-              <div className="max-h-48 overflow-y-auto space-y-0.5">
-                {history.map((item, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      setQuery(item.query);
-                      setShowHistory(false);
-                    }}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-700/60 flex items-center justify-between text-xs text-slate-200 transition-colors group"
-                  >
-                    <div className="flex items-center gap-2 font-mono truncate">
-                      <span className="font-semibold text-cyan-300 group-hover:text-cyan-200">{item.query}</span>
-                      {item.netname && <span className="text-slate-400 text-[11px] font-sans truncate">({item.netname})</span>}
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-sans shrink-0 ml-2">
-                      {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </form>
-
         {/* Quick Sample Queries */}
-        <div className="mt-3 sm:mt-4 flex items-center flex-wrap gap-1.5 sm:gap-2 text-xs">
-          <span className="text-slate-400 flex items-center gap-1 font-medium text-[11px] sm:text-xs">
-            <Sparkles className="w-3 h-3 text-cyan-400" />
-            {t.search.quickSamples}
-          </span>
+        <div style={{ marginTop: 14, textAlign: 'start', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+          <Space orientation="horizontal" size={4} align="center">
+            <ThunderboltOutlined style={{ color: token.colorPrimary, fontSize: 12 }} />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {t.search.quickSamples}:
+            </Text>
+          </Space>
           {SAMPLE_QUERIES.map((sample, idx) => (
-            <button
+            <Tag
               key={idx}
-              type="button"
+              color="default"
+              style={{ cursor: 'pointer', margin: '2px 4px' }}
               onClick={() => {
                 setQuery(sample.query);
                 onSearch(sample.query);
               }}
-              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition-all text-[11px] sm:text-xs font-mono group"
             >
-              <span className="text-[9px] sm:text-[10px] font-sans px-1 py-0.2 bg-slate-900 rounded text-cyan-400 group-hover:text-cyan-300">
+              <Text type="secondary" style={{ fontSize: 10, marginInlineEnd: 4 }}>
                 {sample.tag}
-              </span>
-              <span>{sample.query}</span>
-            </button>
+              </Text>
+              <span style={{ fontFamily: 'monospace' }}>{sample.query}</span>
+            </Tag>
           ))}
         </div>
-
       </div>
     </div>
   );

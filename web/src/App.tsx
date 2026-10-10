@@ -1,4 +1,28 @@
 import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
+import {
+  ConfigProvider,
+  Layout,
+  App as AntdApp,
+  Tabs,
+  Alert,
+  Button,
+  Skeleton,
+  Space,
+  Typography,
+  theme,
+} from 'antd';
+import enUS from 'antd/locale/en_US';
+import faIR from 'antd/locale/fa_IR';
+import {
+  ReloadOutlined,
+  ClusterOutlined,
+  RadarChartOutlined,
+  SafetyCertificateOutlined,
+  GlobalOutlined,
+  CalculatorOutlined,
+  DatabaseOutlined,
+  CodeOutlined,
+} from '@ant-design/icons';
 import { WhoisRecord, AsnRecord, ActiveView, ActiveTab, SearchHistoryItem } from './types';
 import { Navbar } from './components/Navbar';
 import { SearchHeader } from './components/SearchHeader';
@@ -6,7 +30,6 @@ import { SummaryCards } from './components/SummaryCards';
 import { OverviewTab } from './components/OverviewTab';
 import { useLanguage } from './i18n/LanguageContext';
 import { parseRoute, navigateRoute, updateDocumentSeoMeta } from './utils/router';
-import { Network, Database, Radio, ShieldAlert, Globe, Calculator, Terminal, AlertCircle, RefreshCw } from 'lucide-react';
 
 // Code-split Views for Core Web Vitals LCP & Bundle Size
 const CountryIpExplorer = lazy(() => import('./components/CountryIpExplorer').then(m => ({ default: m.CountryIpExplorer })));
@@ -27,16 +50,18 @@ const GeolocTab = lazy(() => import('./components/GeolocTab').then(m => ({ defau
 const SubnetTab = lazy(() => import('./components/SubnetTab').then(m => ({ default: m.SubnetTab })));
 const RawWhoisTab = lazy(() => import('./components/RawWhoisTab').then(m => ({ default: m.RawWhoisTab })));
 
+const { Content, Footer } = Layout;
+const { Text } = Typography;
+
 const ViewFallback = () => (
-  <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-6 animate-pulse">
-    <div className="h-28 bg-slate-800/60 rounded-2xl border border-slate-700/50" />
-    <div className="h-96 bg-slate-800/40 rounded-2xl border border-slate-700/40" />
+  <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px', width: '100%' }}>
+    <Skeleton active paragraph={{ rows: 8 }} />
   </div>
 );
 
 const TabFallback = () => (
-  <div className="space-y-4 animate-pulse pt-2">
-    <div className="h-72 bg-slate-850 rounded-2xl border border-slate-800" />
+  <div style={{ padding: '16px 0' }}>
+    <Skeleton active paragraph={{ rows: 6 }} />
   </div>
 );
 
@@ -62,10 +87,8 @@ export default function App() {
       const storedTheme = localStorage.getItem('iphub_theme');
       if (storedTheme === 'light') {
         setIsDarkTheme(false);
-        document.documentElement.classList.add('light');
       } else {
         setIsDarkTheme(true);
-        document.documentElement.classList.remove('light');
       }
     } catch {
       // ignore
@@ -75,12 +98,10 @@ export default function App() {
   const toggleTheme = () => {
     setIsDarkTheme(prev => {
       const next = !prev;
-      if (next) {
-        document.documentElement.classList.remove('light');
-        localStorage.setItem('iphub_theme', 'dark');
-      } else {
-        document.documentElement.classList.add('light');
-        localStorage.setItem('iphub_theme', 'light');
+      try {
+        localStorage.setItem('iphub_theme', next ? 'dark' : 'light');
+      } catch {
+        // ignore
       }
       return next;
     });
@@ -271,363 +292,319 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [query, language]);
 
+  const tabItems = currentRecord
+    ? [
+        {
+          key: 'overview',
+          label: (
+            <Space orientation="horizontal" size={6}>
+              <ClusterOutlined />
+              <span>{t.tabs.overview}</span>
+            </Space>
+          ),
+          children: (
+            <OverviewTab
+              record={currentRecord}
+              onSearchResource={(res) => performLookup(res, true)}
+            />
+          ),
+        },
+        {
+          key: 'routing',
+          label: (
+            <Space orientation="horizontal" size={6}>
+              <RadarChartOutlined />
+              <span>{t.tabs.routing}</span>
+              {currentRecord.routing.isAnnounced && (
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#52c41a', display: 'inline-block' }} />
+              )}
+            </Space>
+          ),
+          children: (
+            <Suspense fallback={<TabFallback />}>
+              <RoutingTab
+                routing={currentRecord.routing}
+                cidr={currentRecord.cidr}
+                onSearchResource={(res) => performLookup(res, true)}
+              />
+            </Suspense>
+          ),
+        },
+        {
+          key: 'abuse',
+          label: (
+            <Space orientation="horizontal" size={6}>
+              <SafetyCertificateOutlined />
+              <span>{t.tabs.abuse}</span>
+            </Space>
+          ),
+          children: (
+            <Suspense fallback={<TabFallback />}>
+              <AbuseTab
+                abuse={currentRecord.abuseContact}
+                record={currentRecord}
+              />
+            </Suspense>
+          ),
+        },
+        {
+          key: 'geoloc',
+          label: (
+            <Space orientation="horizontal" size={6}>
+              <GlobalOutlined />
+              <span>{t.tabs.location}</span>
+            </Space>
+          ),
+          children: (
+            <Suspense fallback={<TabFallback />}>
+              <GeolocTab
+                geoloc={currentRecord.geolocation}
+                ip={currentRecord.query}
+                reverseDns={currentRecord.reverseDns}
+              />
+            </Suspense>
+          ),
+        },
+        {
+          key: 'subnet',
+          label: (
+            <Space orientation="horizontal" size={6}>
+              <CalculatorOutlined />
+              <span>{t.tabs.subnet}</span>
+            </Space>
+          ),
+          children: (
+            <Suspense fallback={<TabFallback />}>
+              <SubnetTab
+                subnet={currentRecord.subnet}
+                cidr={currentRecord.cidr}
+              />
+            </Suspense>
+          ),
+        },
+        {
+          key: 'objects',
+          label: (
+            <Space orientation="horizontal" size={6}>
+              <DatabaseOutlined />
+              <span>{t.tabs.objects}</span>
+              <span style={{ fontSize: 11, opacity: 0.7 }}>
+                ({currentRecord.ripeObjects?.length || 0})
+              </span>
+            </Space>
+          ),
+          children: (
+            <Suspense fallback={<TabFallback />}>
+              <RipeObjectsTab
+                objects={currentRecord.ripeObjects}
+                onSearchResource={(res) => performLookup(res, true)}
+              />
+            </Suspense>
+          ),
+        },
+        {
+          key: 'raw',
+          label: (
+            <Space orientation="horizontal" size={6}>
+              <CodeOutlined />
+              <span>{t.tabs.rawWhois}</span>
+            </Space>
+          ),
+          children: (
+            <Suspense fallback={<TabFallback />}>
+              <RawWhoisTab
+                rawText={currentRecord.rawWhoisText}
+                query={currentRecord.query}
+                source={currentRecord.source}
+              />
+            </Suspense>
+          ),
+        },
+      ]
+    : [];
+
   return (
-    <div className={`min-h-screen ${isDarkTheme ? 'bg-[#0b1120] text-slate-100' : 'bg-slate-100 text-slate-900'} flex flex-col antialiased selection:bg-cyan-500/30 selection:text-cyan-200 transition-colors duration-200`}>
-
-      {/* Top Navbar */}
-      <Navbar
-        activeView={activeView}
-        setActiveView={(v) => handleNavigateView(v)}
-        onMyIpClick={handleMyIp}
-        isLoadingMyIp={isLoadingMyIp}
-        isDarkTheme={isDarkTheme}
-        onToggleTheme={toggleTheme}
-      />
-
-      {/* Conditional View Rendering */}
-      <Suspense fallback={<ViewFallback />}>
-        {activeView === 'country-ips' && (
-          <main className="flex-1">
-            <CountryIpExplorer
-              onInspectResource={(resource) => {
-                setQuery(resource);
-                handleNavigateView('lookup', { query: resource });
-                performLookup(resource, true);
-              }}
-            />
-          </main>
-        )}
-
-        {activeView === 'batch' && (
-          <main className="flex-1">
-            <BatchInspector
-              onInspectSingle={(ip) => {
-                setQuery(ip);
-                handleNavigateView('lookup', { query: ip });
-                performLookup(ip, true);
-              }}
-            />
-          </main>
-        )}
-
-        {activeView === 'subnet-calc' && (
-          <main className="flex-1">
-            <SubnetCalcTool />
-          </main>
-        )}
-
-        {activeView === 'source' && (
-          <main className="flex-1">
-            <SourceView />
-          </main>
-        )}
-
-        {activeView === 'issues' && (
-          <main className="flex-1">
-            <IssuesView />
-          </main>
-        )}
-
-        {activeView === 'settings' && (
-          <main className="flex-1">
-            <SettingsModal
-              isDarkTheme={isDarkTheme}
-              onToggleTheme={toggleTheme}
-              onClose={() => handleNavigateView('lookup')}
-            />
-          </main>
-        )}
-
-        {activeView === 'not-found' && (
-          <main className="flex-1">
-            <NotFoundView onNavigate={handleNavigateView} />
-          </main>
-        )}
-      </Suspense>
-
-      {activeView === 'lookup' && (
-        <main className="flex-1 flex flex-col">
-
-          {/* Search Header */}
-          <SearchHeader
-            query={query}
-            setQuery={setQuery}
-            onSearch={(q) => performLookup(q, true)}
-            isLoading={isLoading}
-            history={searchHistory}
-            onClearHistory={handleClearHistory}
+    <ConfigProvider
+      theme={{
+        algorithm: isDarkTheme ? theme.darkAlgorithm : theme.defaultAlgorithm,
+        token: isDarkTheme
+          ? undefined
+          : {
+              colorBgLayout: '#f4f6f8',
+              colorBgContainer: '#ffffff',
+              colorBorderSecondary: '#d0d7de',
+              colorBorder: '#bec4ce',
+            },
+      }}
+      locale={language === 'fa' ? faIR : enUS}
+      direction={isRtl ? 'rtl' : 'ltr'}
+    >
+      <AntdApp>
+        <Layout style={{ minHeight: '100vh' }}>
+          {/* Top Navbar */}
+          <Navbar
+            activeView={activeView}
+            setActiveView={(v) => handleNavigateView(v)}
+            onMyIpClick={handleMyIp}
+            isLoadingMyIp={isLoadingMyIp}
+            isDarkTheme={isDarkTheme}
+            onToggleTheme={toggleTheme}
           />
 
-          <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 w-full space-y-5 sm:space-y-6 flex-1">
-
-            {/* Error Notification */}
-            {error && (
-              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-start justify-between gap-4 text-red-300">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-sm block">{t.search.queryError}</span>
-                    <p className="text-xs text-red-300/90 mt-0.5">{error}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => (query ? performLookup(query, true) : handleMyIp())}
-                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-200 rounded-lg transition-colors shrink-0"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>{t.search.retry}</span>
-                </button>
-              </div>
-            )}
-
-            {/* Loading Skeleton with CLS Layout Stabilization */}
-            {isLoading && !currentRecord && !asnRecord && (
-              <div className="space-y-6 animate-pulse">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="min-h-[142px] bg-slate-800/60 rounded-xl border border-slate-700/50" />
-                  ))}
-                </div>
-                <div className="h-12 border-b border-slate-800/80 flex items-center gap-2">
-                  <div className="h-8 w-28 bg-slate-800/60 rounded-xl" />
-                  <div className="h-8 w-24 bg-slate-800/40 rounded-xl" />
-                  <div className="h-8 w-24 bg-slate-800/40 rounded-xl" />
-                  <div className="h-8 w-24 bg-slate-800/40 rounded-xl" />
-                </div>
-                <div className="h-96 bg-slate-800/40 rounded-2xl border border-slate-700/40" />
-              </div>
-            )}
-
-            {/* ASN Specialized View */}
-            {!isLoading && asnRecord && (
-              <Suspense fallback={<ViewFallback />}>
-                <AsnView
-                  record={asnRecord}
-                  onSearchResource={(res) => performLookup(res, true)}
-                  onBack={() => {
-                    setAsnRecord(null);
-                    if (searchHistory.length > 0) {
-                      performLookup(searchHistory[0].query, true);
-                    } else {
-                      handleMyIp();
-                    }
+          <Content style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+            {/* Conditional View Rendering */}
+            <Suspense fallback={<ViewFallback />}>
+              {activeView === 'country-ips' && (
+                <CountryIpExplorer
+                  onInspectResource={(resource) => {
+                    setQuery(resource);
+                    handleNavigateView('lookup', { query: resource });
+                    performLookup(resource, true);
                   }}
                 />
-              </Suspense>
-            )}
+              )}
 
-            {/* Regular IP / Prefix Result View */}
-            {!isLoading && currentRecord && (
-              <div className="space-y-6">
+              {activeView === 'batch' && (
+                <BatchInspector
+                  onInspectSingle={(ip) => {
+                    setQuery(ip);
+                    handleNavigateView('lookup', { query: ip });
+                    performLookup(ip, true);
+                  }}
+                />
+              )}
 
-                {/* 4 Summary Cards */}
-                <SummaryCards
-                  record={currentRecord}
-                  onSearchResource={(res) => performLookup(res, true)}
-                  onExploreCountry={(cCode) => handleNavigateView('country-ips', { countryCode: cCode })}
+              {activeView === 'subnet-calc' && <SubnetCalcTool />}
+              {activeView === 'source' && <SourceView />}
+              {activeView === 'issues' && <IssuesView />}
+              {activeView === 'settings' && (
+                <SettingsModal
+                  isDarkTheme={isDarkTheme}
+                  onToggleTheme={toggleTheme}
+                  onClose={() => handleNavigateView('lookup')}
+                />
+              )}
+              {activeView === 'not-found' && <NotFoundView onNavigate={handleNavigateView} />}
+            </Suspense>
+
+            {activeView === 'lookup' && (
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                {/* Search Header */}
+                <SearchHeader
+                  query={query}
+                  setQuery={setQuery}
+                  onSearch={(q) => performLookup(q, true)}
+                  isLoading={isLoading}
+                  history={searchHistory}
+                  onClearHistory={handleClearHistory}
                 />
 
-                {/* Tabs Navigation Bar */}
-                <div className="border-b border-slate-800">
-                  <nav className="flex space-x-1 sm:space-x-4 overflow-x-auto pb-1 scrollbar-none" aria-label="Tabs">
-                    <button
-                      onClick={() => setActiveTab('overview')}
-                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'overview'
-                          ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-bold shadow-sm'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                        }`}
-                    >
-                      <Network className="w-4 h-4" />
-                      <span>{t.tabs.overview}</span>
-                    </button>
-
-                    <button
-                      onClick={() => setActiveTab('routing')}
-                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'routing'
-                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30 font-bold shadow-sm'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                        }`}
-                    >
-                      <Radio className="w-4 h-4" />
-                      <span>{t.tabs.routing}</span>
-                      {currentRecord.routing.isAnnounced && (
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                      )}
-                    </button>
-
-                    <button
-                      onClick={() => setActiveTab('abuse')}
-                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'abuse'
-                          ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30 font-bold shadow-sm'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                        }`}
-                    >
-                      <ShieldAlert className="w-4 h-4" />
-                      <span>{t.tabs.abuse}</span>
-                    </button>
-
-                    <button
-                      onClick={() => setActiveTab('geoloc')}
-                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'geoloc'
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold shadow-sm'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                        }`}
-                    >
-                      <Globe className="w-4 h-4" />
-                      <span>{t.tabs.location}</span>
-                    </button>
-
-                    <button
-                      onClick={() => setActiveTab('subnet')}
-                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'subnet'
-                          ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 font-bold shadow-sm'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                        }`}
-                    >
-                      <Calculator className="w-4 h-4" />
-                      <span>{t.tabs.subnet}</span>
-                    </button>
-
-                    <button
-                      onClick={() => setActiveTab('objects')}
-                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'objects'
-                          ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30 font-bold shadow-sm'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                        }`}
-                    >
-                      <Database className="w-4 h-4" />
-                      <span>{t.tabs.objects}</span>
-                      <span className="text-[10px] px-1.5 py-0.2 bg-slate-800 rounded font-mono text-slate-400">
-                        {currentRecord.ripeObjects?.length || 0}
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => setActiveTab('raw')}
-                      className={`py-3 px-3.5 rounded-xl font-medium text-xs flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'raw'
-                          ? 'bg-purple-500/10 text-purple-400 border border-purple-500/30 font-bold shadow-sm'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                        }`}
-                    >
-                      <Terminal className="w-4 h-4" />
-                      <span>{t.tabs.rawWhois}</span>
-                    </button>
-                  </nav>
-                </div>
-
-                {/* Tab Contents */}
-                <div>
-                  {activeTab === 'overview' && (
-                    <OverviewTab
-                      record={currentRecord}
-                      onSearchResource={(res) => performLookup(res, true)}
+                <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px', width: '100%', flex: 1 }}>
+                  {/* Error Notification */}
+                  {error && (
+                    <Alert
+                      type="error"
+                      showIcon
+                      title={t.search.queryError}
+                      description={error}
+                      action={
+                        <Button
+                          size="small"
+                          danger
+                          icon={<ReloadOutlined />}
+                          onClick={() => (query ? performLookup(query, true) : handleMyIp())}
+                        >
+                          {t.search.retry}
+                        </Button>
+                      }
+                      style={{ marginBottom: 20 }}
                     />
                   )}
 
-                  <Suspense fallback={<TabFallback />}>
-                    {activeTab === 'routing' && (
-                      <RoutingTab
-                        routing={currentRecord.routing}
-                        cidr={currentRecord.cidr}
-                        onSearchResource={(res) => performLookup(res, true)}
-                      />
-                    )}
+                  {/* Loading Skeleton */}
+                  {isLoading && !currentRecord && !asnRecord && (
+                    <div style={{ padding: '20px 0' }}>
+                      <Skeleton active paragraph={{ rows: 10 }} />
+                    </div>
+                  )}
 
-                    {activeTab === 'abuse' && (
-                      <AbuseTab
-                        abuse={currentRecord.abuseContact}
+                  {/* ASN Specialized View */}
+                  {!isLoading && asnRecord && (
+                    <Suspense fallback={<ViewFallback />}>
+                      <AsnView
+                        record={asnRecord}
+                        onSearchResource={(res) => performLookup(res, true)}
+                        onBack={() => {
+                          setAsnRecord(null);
+                          if (searchHistory.length > 0) {
+                            performLookup(searchHistory[0].query, true);
+                          } else {
+                            handleMyIp();
+                          }
+                        }}
+                      />
+                    </Suspense>
+                  )}
+
+                  {/* Regular IP / Prefix Result View */}
+                  {!isLoading && currentRecord && (
+                    <Space orientation="vertical" size="large" style={{ width: '100%' }}>
+                      {/* 4 Summary Cards */}
+                      <SummaryCards
                         record={currentRecord}
-                      />
-                    )}
-
-                    {activeTab === 'geoloc' && (
-                      <GeolocTab
-                        geoloc={currentRecord.geolocation}
-                        ip={currentRecord.query}
-                        reverseDns={currentRecord.reverseDns}
-                      />
-                    )}
-
-                    {activeTab === 'subnet' && (
-                      <SubnetTab
-                        subnet={currentRecord.subnet}
-                        cidr={currentRecord.cidr}
-                      />
-                    )}
-
-                    {activeTab === 'objects' && (
-                      <RipeObjectsTab
-                        objects={currentRecord.ripeObjects}
                         onSearchResource={(res) => performLookup(res, true)}
+                        onExploreCountry={(cCode) => handleNavigateView('country-ips', { countryCode: cCode })}
                       />
-                    )}
 
-                    {activeTab === 'raw' && (
-                      <RawWhoisTab
-                        rawText={currentRecord.rawWhoisText}
-                        query={currentRecord.query}
-                        source={currentRecord.source}
+                      {/* Tabs Navigation and Contents */}
+                      <Tabs
+                        activeKey={activeTab}
+                        onChange={(k) => setActiveTab(k as ActiveTab)}
+                        items={tabItems}
+                        size="large"
                       />
-                    )}
-                  </Suspense>
+                    </Space>
+                  )}
                 </div>
-
               </div>
             )}
+          </Content>
 
-          </div>
+          {/* Rich SEO Content Section */}
+          <Suspense fallback={null}>
+            <SeoSection />
+          </Suspense>
 
-        </main>
-      )}
+          {/* Footer */}
+          <Footer style={{ textAlign: 'center', fontSize: 12, padding: '24px 16px' }}>
+            <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+              <Space orientation="horizontal" size={8}>
+                <Text strong>{t.brand}</Text>
+                <span>&bull;</span>
+                <Text type="secondary">{t.footer.ripestatTools}</Text>
+              </Space>
 
-      {/* Rich SEO Content Section (Lazy-loaded below the fold) */}
-      <Suspense fallback={null}>
-        <SeoSection />
-      </Suspense>
-
-      {/* Footer */}
-      <footer className="border-t border-slate-800/80 bg-slate-950 py-6 px-4 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-400">{t.brand}</span>
-            <span>&bull;</span>
-            <span>{t.footer.ripestatTools}</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => handleNavigateView('country-ips')}
-              className="text-slate-400 hover:text-cyan-400 transition-colors"
-            >
-              {t.nav.countryIps}
-            </button>
-            <button
-              onClick={() => handleNavigateView('subnet-calc')}
-              className="text-slate-400 hover:text-cyan-400 transition-colors"
-            >
-              {t.nav.subnetCalc}
-            </button>
-            <button
-              onClick={() => handleNavigateView('batch')}
-              className="text-slate-400 hover:text-cyan-400 transition-colors"
-            >
-              {t.nav.batch}
-            </button>
-            <button
-              onClick={() => handleNavigateView('source')}
-              className="text-slate-400 hover:text-cyan-400 transition-colors"
-            >
-              {t.nav.source}
-            </button>
-            <button
-              onClick={() => handleNavigateView('issues')}
-              className="text-slate-400 hover:text-cyan-400 transition-colors"
-            >
-              {t.nav.issues}
-            </button>
-          </div>
-        </div>
-      </footer>
-
-    </div>
+              <Space orientation="horizontal" size={16} wrap>
+                <Button type="link" size="small" onClick={() => handleNavigateView('country-ips')}>
+                  {t.nav.countryIps}
+                </Button>
+                <Button type="link" size="small" onClick={() => handleNavigateView('subnet-calc')}>
+                  {t.nav.subnetCalc}
+                </Button>
+                <Button type="link" size="small" onClick={() => handleNavigateView('batch')}>
+                  {t.nav.batch}
+                </Button>
+                <Button type="link" size="small" onClick={() => handleNavigateView('source')}>
+                  {t.nav.source}
+                </Button>
+                <Button type="link" size="small" onClick={() => handleNavigateView('issues')}>
+                  {t.nav.issues}
+                </Button>
+              </Space>
+            </div>
+          </Footer>
+        </Layout>
+      </AntdApp>
+    </ConfigProvider>
   );
 }
