@@ -1,7 +1,7 @@
 # ==========================================
 # Stage 1: Build Modern React Frontend
 # ==========================================
-FROM node:20-alpine AS frontend-builder
+FROM node:alpine AS frontend-builder
 
 WORKDIR /app/web
 
@@ -21,6 +21,7 @@ RUN apk add --no-cache build-base ca-certificates
 
 ARG Version
 ENV GOCACHE=/root/.cache/go-build
+ENV GOTOOLCHAIN=auto
 
 WORKDIR /build
 
@@ -34,20 +35,20 @@ RUN go build -ldflags="-X 'github.com/kzeedev/IP-Hub/config.Version=${Version}' 
 
 # Build dynamic Go plugins
 RUN for f in plugins/*/*.go; do \
-        if [ -f "$f" ]; then \
-            echo "Building plugin $f"; \
-            dir=$(dirname "$f"); \
-            mkdir -p "/dist/$dir"; \
-            go build -buildmode=plugin -ldflags='-s -w' -trimpath -o "/dist/${f%.go}.so" "$f"; \
-        fi \
+    if [ -f "$f" ]; then \
+    echo "Building plugin $f"; \
+    dir=$(dirname "$f"); \
+    mkdir -p "/dist/$dir"; \
+    go build -buildmode=plugin -ldflags='-s -w' -trimpath -o "/dist/${f%.go}.so" "$f"; \
+    fi \
     done
 
 # Copy required dynamic shared libraries for musl / scratch execution
 RUN ldd /dist/app 2>/dev/null | tr -s '[:blank:]' '\n' | grep '^/' | xargs -I % install -D % /dist/% || true
 RUN mkdir -p /dist/lib && \
     if [ -f /lib/ld-musl-x86_64.so.1 ]; then \
-        install -D /lib/ld-musl-x86_64.so.1 /dist/lib/ld-musl-x86_64.so.1 && \
-        ln -sf ld-musl-x86_64.so.1 /dist/lib/libc.musl-x86_64.so.1; \
+    install -D /lib/ld-musl-x86_64.so.1 /dist/lib/ld-musl-x86_64.so.1 && \
+    ln -sf ld-musl-x86_64.so.1 /dist/lib/libc.musl-x86_64.so.1; \
     fi
 
 # Setup directories, SSL certificates, public assets, and compiled frontend SPA
