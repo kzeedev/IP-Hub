@@ -578,15 +578,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({ onInspectR
                 ]}
                 style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
               >
-                <Card
-                  hoverable
-                  onClick={() => setActiveTab('ipv4')}
-                  style={{
-                    height: '100%',
-                    border: activeTab === 'ipv4' ? `2px solid ${token.colorPrimary}` : undefined,
-                    background: activeTab === 'ipv4' ? token.colorPrimaryBg : undefined,
-                  }}
-                >
+                <Card style={{ height: '100%' }}>
                   <Statistic
                     title={
                       <Space orientation="horizontal" size={6}>
@@ -612,15 +604,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({ onInspectR
                 ]}
                 style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
               >
-                <Card
-                  hoverable
-                  onClick={() => setActiveTab('ipv6')}
-                  style={{
-                    height: '100%',
-                    border: activeTab === 'ipv6' ? `2px solid #722ed1` : undefined,
-                    background: activeTab === 'ipv6' ? '#f9f0ff' : undefined,
-                  }}
-                >
+                <Card style={{ height: '100%' }}>
                   <Statistic
                     title={
                       <Space orientation="horizontal" size={6}>
@@ -646,15 +630,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({ onInspectR
                 ]}
                 style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
               >
-                <Card
-                  hoverable
-                  onClick={() => setActiveTab('asns')}
-                  style={{
-                    height: '100%',
-                    border: activeTab === 'asns' ? `2px solid #fa8c16` : undefined,
-                    background: activeTab === 'asns' ? '#fff7e6' : undefined,
-                  }}
-                >
+                <Card style={{ height: '100%' }}>
                   <Statistic
                     title={
                       <Space orientation="horizontal" size={6}>
