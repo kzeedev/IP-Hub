@@ -12,7 +12,7 @@
   <meta name="description"
     content="IP-Hub is a powerful, free network intelligence platform offering up-to-date Country IP lists in MikroTik address-list, Cisco ACL, FreeBSD PF, .htaccess, and iptables formats, alongside RIPE WHOIS and BGP routing lookup." />
   <meta name="robots" content="follow, index, max-snippet:-1, max-video-preview:-1, max-image-preview:large" />
-  <meta name="theme-color" content="#0b1120" />
+  <meta name="theme-color" content="#1677ff" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -44,6 +44,75 @@
 
   <link rel="canonical" href="https://ip-hub.ir/" />
 
+  <!-- Ant Design Theme Variables & Early Preference Initialization -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('iphub_theme');
+        if (t === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    :root {
+      --ant-primary: #1677ff;
+      --ant-primary-hover: #4096ff;
+      --ant-primary-bg: rgba(22, 119, 255, 0.15);
+      --ant-bg-layout: #000000;
+      --ant-bg-container: #141414;
+      --ant-bg-elevated: #1f1f1f;
+      --ant-border: #424242;
+      --ant-border-secondary: #303030;
+      --ant-text: rgba(255, 255, 255, 0.85);
+      --ant-text-heading: rgba(255, 255, 255, 0.88);
+      --ant-text-secondary: rgba(255, 255, 255, 0.45);
+      --ant-radius: 8px;
+      --ant-radius-sm: 4px;
+      --ant-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    }
+
+    [data-theme="light"] {
+      --ant-primary: #1677ff;
+      --ant-primary-hover: #4096ff;
+      --ant-primary-bg: #e6f4ff;
+      --ant-bg-layout: #f4f6f8;
+      --ant-bg-container: #ffffff;
+      --ant-bg-elevated: #ffffff;
+      --ant-border: #bec4ce;
+      --ant-border-secondary: #d0d7de;
+      --ant-text: rgba(0, 0, 0, 0.88);
+      --ant-text-heading: rgba(0, 0, 0, 0.88);
+      --ant-text-secondary: rgba(0, 0, 0, 0.45);
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--ant-bg-layout);
+      color: var(--ant-text);
+      font-family: var(--ant-font-family);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    a {
+      color: var(--ant-primary);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    a:hover {
+      color: var(--ant-primary-hover);
+    }
+
+    ::selection {
+      background-color: rgba(22, 119, 255, 0.25);
+      color: #1677ff;
+    }
+  </style>
+
   <!-- Immediate Soft-404 Detection to prevent search engine indexing -->
   <script>
     (function () {
@@ -53,7 +122,7 @@
         if (s.length > 0 && (s[0] === 'fa' || s[0] === 'en')) {
           s.shift();
         }
-        var valid = ['country', 'countries', 'country-ips', 'batch', 'batch-inspector', 'subnet-calc', 'subnet', 'calculator', 'source', 'about', 'issues', 'bugs', 'lookup', 'ip', 'asn', 'prefix'];
+        var valid = ['country', 'countries', 'country-ips', 'batch', 'batch-inspector', 'subnet-calc', 'subnet', 'calculator', 'source', 'about', 'issues', 'bugs', 'settings', 'lookup', 'ip', 'asn', 'prefix'];
         if (s.length > 0 && valid.indexOf(s[0]) === -1) {
           var robots = document.querySelector('meta[name="robots"]');
           if (robots) robots.setAttribute('content', 'noindex, nofollow, noarchive');
@@ -131,86 +200,101 @@
   </script>
 </head>
 
-<body class="bg-[#0b1120] text-slate-100 antialiased selection:bg-cyan-500/30 selection:text-cyan-200 min-h-screen">
+<body style="background-color: var(--ant-bg-layout); color: var(--ant-text); min-height: 100vh;">
   <div id="root">
     <!-- Instant Pre-render Shell for LCP & CLS Optimization -->
     <header
-      style="height: 4rem; background-color: rgba(15, 23, 42, 0.95); border-bottom: 1px solid #1e293b; display: flex; align-items: center; padding: 0 1.5rem;">
-      <div style="max-width: 80rem; width: 100%; margin: 0 auto; display: flex; align-items: center; gap: 0.75rem;">
+      style="height: 56px; background-color: var(--ant-bg-container); border-bottom: 1px solid var(--ant-border-secondary); display: flex; align-items: center; padding: 0 16px; position: sticky; top: 0; z-index: 100;">
+      <div style="max-width: 1200px; width: 100%; margin: 0 auto; display: flex; align-items: center; gap: 10px;">
         <div
-          style="width: 2.25rem; height: 2.25rem; border-radius: 0.75rem; background: linear-gradient(135deg, #0891b2, #2563eb, #4f46e5); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 15px -3px rgba(6, 182, 212, 0.2);">
-          <svg style="width: 1.25rem; height: 1.25rem; color: #ffffff;" fill="none" viewBox="0 0 24 24"
-            stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v20m10-10H2" />
+          style="width: 32px; height: 32px; border-radius: 8px; background: #1677ff; color: #ffffff; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <svg viewBox="64 64 896 896" width="18" height="18" fill="currentColor" focusable="false" aria-hidden="true">
+            <path d="M888 680h-54V540H546v-92h238c8.8 0 16-7.2 16-16V168c0-8.8-7.2-16-16-16H240c-8.8 0-16 7.2-16 16v264c0 8.8 7.2 16 16 16h238v92H190v140h-54c-4.4 0-8 3.6-8 8v176c0 4.4 3.6 8 8 8h176c4.4 0 8-3.6 8-8V688c0-4.4-3.6-8-8-8h-54v-72h220v72h-54c-4.4 0-8 3.6-8 8v176c0 4.4 3.6 8 8 8h176c4.4 0 8-3.6 8-8V688c0-4.4-3.6-8-8-8h-54v-72h220v72h-54c-4.4 0-8 3.6-8 8v176c0 4.4 3.6 8 8 8h176c4.4 0 8-3.6 8-8V688c0-4.4-3.6-8-8-8zM256 805.3c0 1.5-1.2 2.7-2.7 2.7h-58.7c-1.5 0-2.7-1.2-2.7-2.7v-58.7c0-1.5 1.2-2.7 2.7-2.7h58.7c1.5 0 2.7 1.2 2.7 2.7v58.7zm288 0c0 1.5-1.2 2.7-2.7 2.7h-58.7c-1.5 0-2.7-1.2-2.7-2.7v-58.7c0-1.5 1.2-2.7 2.7-2.7h58.7c1.5 0 2.7 1.2 2.7 2.7v58.7zM288 384V216h448v168H288zm544 421.3c0 1.5-1.2 2.7-2.7 2.7h-58.7c-1.5 0-2.7-1.2-2.7-2.7v-58.7c0-1.5 1.2-2.7 2.7-2.7h58.7c1.5 0 2.7 1.2 2.7 2.7v58.7zM360 300a40 40 0 1080 0 40 40 0 10-80 0z" />
           </svg>
         </div>
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-          <span style="font-weight: 700; font-size: 1.125rem; color: #ffffff; letter-spacing: -0.025em;">IP-Hub</span>
+        <div style="display: flex; align-items: center;">
+          <span style="font-weight: 700; font-size: 16px; color: var(--ant-text-heading);">IP-Hub</span>
           <span
-            style="font-size: 0.625rem; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.1); padding: 0.125rem 0.375rem; border-radius: 0.25rem; border: 1px solid rgba(56, 189, 248, 0.3); text-transform: uppercase;">RIPE
-            &amp; GeoIP</span>
+            style="margin-inline-start: 8px; font-size: 11px; line-height: 18px; padding: 0 7px; border-radius: 4px; background: var(--ant-primary-bg); color: var(--ant-primary); border: 1px solid rgba(22, 119, 255, 0.25); display: inline-block;">RIPE &amp; GeoIP</span>
         </div>
       </div>
     </header>
     <div
-      style="background-color: #0f172a; border-bottom: 1px solid rgba(30, 41, 59, 0.8); padding: 2rem 1.5rem; text-align: center;">
-      <div style="max-width: 56rem; margin: 0 auto;">
+      style="background-color: var(--ant-bg-container); border-bottom: 1px solid var(--ant-border-secondary); padding: 32px 16px; text-align: center;">
+      <div style="max-width: 840px; margin: 0 auto;">
         <h1
-          style="font-size: 1.875rem; font-weight: 800; color: #ffffff; letter-spacing: -0.025em; margin: 0 0 0.5rem 0;">
+          style="font-size: 24px; font-weight: 800; color: var(--ant-text-heading); letter-spacing: -0.025em; margin: 0 0 6px 0;">
           IP-Hub - High-Speed Network Intelligence</h1>
-        <p style="font-size: 0.875rem; color: #94a3b8; margin: 0 auto 1.5rem auto; max-width: 42rem;">Real-time RIPE
+        <p style="font-size: 14px; color: var(--ant-text-secondary); margin: 0 auto 24px auto; max-width: 600px; line-height: 1.5;">Real-time RIPE
           WHOIS lookup, ASN routing inspection, CIDR network intelligence, and multi-platform firewall generators.</p>
         <div
-          style="max-width: 42rem; margin: 0 auto; height: 3.5rem; background: rgba(30, 41, 59, 0.9); border: 1px solid #334155; border-radius: 1rem; display: flex; align-items: center; padding: 0 1rem;">
-          <span style="color: #64748b; font-family: monospace; font-size: 0.875rem;">Enter IP (e.g. 193.0.6.139), ASN,
-            or CIDR...</span>
+          style="max-width: 680px; margin: 0 auto; height: 40px; background: var(--ant-bg-container); border: 1px solid var(--ant-border); border-radius: 8px; display: flex; align-items: stretch; overflow: hidden; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.02);">
+          <div style="display: flex; align-items: center; padding: 0 12px; color: var(--ant-text-secondary);">
+            <svg viewBox="64 64 896 896" width="16" height="16" fill="currentColor" focusable="false" aria-hidden="true">
+              <path d="M909.6 854.5L649.9 594.8C690.2 542.7 712 479 712 412c0-80.2-31.3-155.4-87.9-212.1-56.6-56.7-132-87.9-212.1-87.9s-155.5 31.3-212.1 87.9C143.2 256.5 112 331.8 112 412c0 80.1 31.3 155.5 87.9 212.1C256.5 680.8 331.8 712 412 712c67 0 130.6-21.8 182.7-62l259.7 259.6a8.2 8.2 0 0011.6 0l43.6-43.5a8.2 8.2 0 000-11.6zM570.4 570.4C528 612.7 471.8 636 412 636s-116-23.3-158.4-65.6C211.3 528 188 471.8 188 412s23.3-116.1 65.6-158.4C296 211.3 352.2 188 412 188s116.1 23.2 158.4 65.6S636 352.2 636 412s-23.3 116.1-65.6 158.4z" />
+            </svg>
+          </div>
+          <div style="flex: 1; display: flex; align-items: center; color: var(--ant-text-secondary); font-size: 14px;">
+            Enter IP (e.g. 193.0.6.139), ASN, or CIDR...
+          </div>
+          <div style="background: #1677ff; color: #ffffff; padding: 0 20px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500;">
+            Inspect
+          </div>
         </div>
       </div>
     </div>
     <div
-      style="max-width: 80rem; margin: 2rem auto; padding: 0 1.5rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
+      style="max-width: 1200px; margin: 24px auto; padding: 0 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
       <div
-        style="height: 8.875rem; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(51, 65, 85, 0.6); border-radius: 0.75rem;">
+        style="height: 110px; background: var(--ant-bg-container); border: 1px solid var(--ant-border-secondary); border-radius: 8px; padding: 16px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
+        <div style="width: 40%; height: 14px; border-radius: 4px; background: var(--ant-border-secondary); opacity: 0.7;"></div>
+        <div style="width: 75%; height: 22px; border-radius: 4px; background: var(--ant-border-secondary); opacity: 0.7;"></div>
       </div>
       <div
-        style="height: 8.875rem; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(51, 65, 85, 0.6); border-radius: 0.75rem;">
+        style="height: 110px; background: var(--ant-bg-container); border: 1px solid var(--ant-border-secondary); border-radius: 8px; padding: 16px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
+        <div style="width: 35%; height: 14px; border-radius: 4px; background: var(--ant-border-secondary); opacity: 0.7;"></div>
+        <div style="width: 65%; height: 22px; border-radius: 4px; background: var(--ant-border-secondary); opacity: 0.7;"></div>
       </div>
       <div
-        style="height: 8.875rem; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(51, 65, 85, 0.6); border-radius: 0.75rem;">
+        style="height: 110px; background: var(--ant-bg-container); border: 1px solid var(--ant-border-secondary); border-radius: 8px; padding: 16px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
+        <div style="width: 45%; height: 14px; border-radius: 4px; background: var(--ant-border-secondary); opacity: 0.7;"></div>
+        <div style="width: 80%; height: 22px; border-radius: 4px; background: var(--ant-border-secondary); opacity: 0.7;"></div>
       </div>
       <div
-        style="height: 8.875rem; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(51, 65, 85, 0.6); border-radius: 0.75rem;">
+        style="height: 110px; background: var(--ant-bg-container); border: 1px solid var(--ant-border-secondary); border-radius: 8px; padding: 16px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
+        <div style="width: 30%; height: 14px; border-radius: 4px; background: var(--ant-border-secondary); opacity: 0.7;"></div>
+        <div style="width: 60%; height: 22px; border-radius: 4px; background: var(--ant-border-secondary); opacity: 0.7;"></div>
       </div>
     </div>
     <noscript>
       <div
-        style="font-family: system-ui, -apple-system, sans-serif; padding: 2rem; max-width: 900px; margin: 2rem auto; color: #f8fafc; background: #0f172a; border-radius: 1rem; border: 1px solid #1e293b; line-height: 1.6;">
-        <h1 style="font-size: 1.875rem; font-weight: 800; color: #38bdf8; margin-bottom: 0.75rem;">IP-Hub - Country IP
+        style="padding: 24px; max-width: 900px; margin: 24px auto; color: var(--ant-text); background: var(--ant-bg-container); border-radius: 8px; border: 1px solid var(--ant-border); line-height: 1.6; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);">
+        <h1 style="font-size: 24px; font-weight: 800; color: var(--ant-primary); margin: 0 0 12px 0;">IP-Hub - Country IP
           Lists &amp; RIPE WHOIS Intelligence</h1>
-        <p style="font-size: 1rem; color: #cbd5e1; margin-bottom: 1.5rem;">
+        <p style="font-size: 14px; color: var(--ant-text); margin: 0 0 20px 0;">
           IP-Hub is an open-source, high-performance network intelligence platform providing real-time Country IP range
           downloads (IPv4 &amp; IPv6) in MikroTik address-list, Cisco ACL, FreeBSD PF, Linux ipset, .htaccess, and JSON
           formats, alongside live RIPE WHOIS and BGP routing lookups.
         </p>
-        <h2 style="font-size: 1.25rem; font-weight: 700; color: #f1f5f9; margin-bottom: 0.5rem;">Core Network Tools:
+        <h2 style="font-size: 16px; font-weight: 700; color: var(--ant-text-heading); margin: 0 0 8px 0;">Core Network Tools:
         </h2>
-        <ul style="list-style-type: disc; padding-left: 1.5rem; color: #94a3b8; font-size: 0.95rem;">
-          <li style="margin-bottom: 0.5rem;"><a href="/country-ips"
-              style="color: #38bdf8; text-decoration: underline;">Country IP Lists &amp; Firewall Generator</a> -
+        <ul style="list-style-type: disc; padding-left: 20px; color: var(--ant-text-secondary); font-size: 14px; margin: 0;">
+          <li style="margin-bottom: 8px;"><a href="/country-ips"
+              style="color: var(--ant-primary);">Country IP Lists &amp; Firewall Generator</a> -
             Delegated IPv4 and IPv6 prefixes by country.</li>
-          <li style="margin-bottom: 0.5rem;"><a href="/batch" style="color: #38bdf8; text-decoration: underline;">Batch
+          <li style="margin-bottom: 8px;"><a href="/batch" style="color: var(--ant-primary);">Batch
               WHOIS &amp; ASN Inspector</a> - Concurrently audit multi-target IP addresses, CIDR blocks, and AS numbers.
           </li>
-          <li style="margin-bottom: 0.5rem;"><a href="/subnet-calc"
-              style="color: #38bdf8; text-decoration: underline;">CIDR Subnet Calculator</a> - Network address, usable
+          <li style="margin-bottom: 8px;"><a href="/subnet-calc"
+              style="color: var(--ant-primary);">CIDR Subnet Calculator</a> - Network address, usable
             host ranges, and wildcard mask calculations.</li>
-          <li style="margin-bottom: 0.5rem;"><a href="/source"
-              style="color: #38bdf8; text-decoration: underline;">Source Code &amp; Project Documentation</a> - Open
+          <li style="margin-bottom: 8px;"><a href="/source"
+              style="color: var(--ant-primary);">Source Code &amp; Project Documentation</a> - Open
             source repository on GitHub.</li>
-          <li style="margin-bottom: 0.5rem;"><a href="/issues" style="color: #38bdf8; text-decoration: underline;">Issue
+          <li style="margin-bottom: 8px;"><a href="/issues" style="color: var(--ant-primary);">Issue
               Tracker &amp; Feedback</a> - Report bugs or request network features.</li>
-          <li style="margin-bottom: 0.5rem;"><a href="/settings"
-              style="color: #38bdf8; text-decoration: underline;">Settings</a> - Display
+          <li style="margin-bottom: 8px;"><a href="/settings"
+              style="color: var(--ant-primary);">Settings</a> - Display
             language, theme, and service status.</li>
         </ul>
       </div>
