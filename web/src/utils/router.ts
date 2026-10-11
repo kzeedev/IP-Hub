@@ -73,6 +73,10 @@ export function parseRoute(
     return { view: 'issues', lang };
   }
 
+  if (first === 'settings') {
+    return { view: 'settings', lang };
+  }
+
   if (first === 'lookup' || first === 'ip' || first === 'asn' || first === 'prefix') {
     return { view: 'lookup', query: rest ? decodeURIComponent(rest) : undefined, lang };
   }
@@ -107,6 +111,9 @@ export function getRouteUrl(
       break;
     case 'issues':
       subPath = '/issues';
+      break;
+    case 'settings':
+      subPath = '/settings';
       break;
     case 'lookup':
       if (opts.query && opts.query.trim()) {
@@ -207,6 +214,11 @@ export function updateDocumentSeoMeta(
     case 'issues':
       title = dict.issuesTitle;
       desc = dict.issuesDesc;
+      break;
+
+    case 'settings':
+      title = (dict as any).settingsTitle || 'Settings | IP-Hub';
+      desc = (dict as any).settingsDesc || 'Customize your language, appearance, and check service status.';
       break;
 
     case 'not-found':

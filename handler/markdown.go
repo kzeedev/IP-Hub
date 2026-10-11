@@ -203,6 +203,9 @@ func (h *Handler) generateMarkdownForRoute(c fiber.Ctx) string {
 	case "issues", "bugs":
 		return h.renderIssuesMarkdown(lang)
 
+	case "settings":
+		return h.renderSettingsMarkdown(lang)
+
 	case "lookup", "ip", "asn", "prefix":
 		query := rest
 		if query == "" {
@@ -855,3 +858,30 @@ When submitting an issue, please include:
 3. Client details (browser, curl command, or AI agent).
 `
 }
+
+func (h *Handler) renderSettingsMarkdown(lang string) string {
+	if strings.EqualFold(lang, "fa") {
+		return fmt.Sprintf(`---
+title: تنظیمات سامانه - IP-Hub
+description: تنظیمات زبان، پوسته ظاهری و وضعیت سرویس‌ها.
+---
+
+# تنظیمات سامانه
+
+- **نسخه**: %s
+- **زبان‌های پشتیبانی‌شده**: انگلیسی (en) و فارسی (fa)
+`, config.Version)
+	}
+
+	return fmt.Sprintf(`---
+title: Settings - IP-Hub
+description: Display language, theme preferences, and service status.
+---
+
+# Settings
+
+- **Version**: %s
+- **Supported Languages**: English (en) and Persian (fa)
+`, config.Version)
+}
+

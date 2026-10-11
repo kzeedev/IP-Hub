@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -56,6 +57,7 @@ type WhoisService interface {
 	CountryResourceService
 	SubnetCalculatorService
 	BatchLookupService
+	CheckRipeStatus(ctx context.Context) string
 }
 
 // whoisService is the concrete implementation of WhoisService.
@@ -250,6 +252,28 @@ func (s *whoisService) fetchJSON(targetURL string, target interface{}) error {
 	}
 
 	return json.NewDecoder(resp.Body).Decode(target)
+}
+
+// CheckRipeStatus tests live availability and connectivity to RIPE Stat API.
+// Returns "reachable", "unreachable", or "fail".
+func (s *whoisService) CheckRipeStatus(ctx context.Context) string {
+	var ripeResp struct {
+		Status string `json:"status"`
+	}
+
+	err := s.fetchJSON("https://stat.ripe.net/data/network-info/data.json?resource=8.8.8.8", &ripeResp)
+	if err != nil {
+		if strings.HasPrefix(err.Error(), "status ") {
+			return "fail"
+		}
+		return "unreachable"
+	}
+
+	if strings.EqualFold(ripeResp.Status, "ok") {
+		return "reachable"
+	}
+
+	return "fail"
 }
 
 // LookupIP performs unified WHOIS lookup, GeoLocation resolution, and BGP routing status query.

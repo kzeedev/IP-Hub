@@ -38,7 +38,7 @@ const SubnetCalcTool = lazy(() => import('./components/SubnetCalcTool').then(m =
 const SourceView = lazy(() => import('./components/SourceView').then(m => ({ default: m.SourceView })));
 const IssuesView = lazy(() => import('./components/IssuesView').then(m => ({ default: m.IssuesView })));
 const NotFoundView = lazy(() => import('./components/NotFoundView').then(m => ({ default: m.NotFoundView })));
-const SettingsModal = lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
+const SettingsView = lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
 const AsnView = lazy(() => import('./components/AsnView').then(m => ({ default: m.AsnView })));
 const SeoSection = lazy(() => import('./components/SeoSection').then(m => ({ default: m.SeoSection })));
 
@@ -478,10 +478,10 @@ export default function App() {
               {activeView === 'source' && <SourceView />}
               {activeView === 'issues' && <IssuesView />}
               {activeView === 'settings' && (
-                <SettingsModal
+                <SettingsView
                   isDarkTheme={isDarkTheme}
                   onToggleTheme={toggleTheme}
-                  onClose={() => handleNavigateView('lookup')}
+                  onNavigate={handleNavigateView}
                 />
               )}
               {activeView === 'not-found' && <NotFoundView onNavigate={handleNavigateView} />}

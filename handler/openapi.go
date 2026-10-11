@@ -86,6 +86,16 @@ type SystemVersionOutput struct {
 	}
 }
 
+// SystemStatusInput represents input for getting system and RIPE Stat API status
+type SystemStatusInput struct{}
+
+// SystemStatusOutput represents system and upstream RIPE Stat API availability
+type SystemStatusOutput struct {
+	Body struct {
+		Status string `json:"status" doc:"RIPE Stat API availability: 'reachable', 'unreachable', or 'fail'" example:"reachable"`
+	}
+}
+
 // WhoisResolveOrgsInput represents input for bulk organization resolution
 type WhoisResolveOrgsInput struct {
 	Body struct {
@@ -313,6 +323,20 @@ func (h *Handler) SetupOpenAPI(app *fiber.App) huma.API {
 	}, func(ctx context.Context, input *SystemVersionInput) (*SystemVersionOutput, error) {
 		resp := &SystemVersionOutput{}
 		resp.Body.Version = config.GetVersion()
+		return resp, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "system-status",
+		Method:      http.MethodGet,
+		Path:        "/api/system/status",
+		Summary:     "Get Upstream RIPE Stat API Status",
+		Description: "Checks the real-time availability and connectivity to upstream RIPE Stat APIs and returns 'reachable', 'unreachable', or 'fail'.",
+		Tags:        []string{"System"},
+	}, func(ctx context.Context, input *SystemStatusInput) (*SystemStatusOutput, error) {
+		status := h.svc.CheckRipeStatus(ctx)
+		resp := &SystemStatusOutput{}
+		resp.Body.Status = status
 		return resp, nil
 	})
 

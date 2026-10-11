@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -109,6 +110,10 @@ func (m *MockWhoisService) GetAvailablePlugins() []models.PluginInfo {
 		{ID: "json", Name: "JSON Data"},
 		{ID: "htaccess", Name: "Apache .htaccess"},
 	}
+}
+
+func (m *MockWhoisService) CheckRipeStatus(ctx context.Context) string {
+	return "reachable"
 }
 
 func TestNewHandlerDependencyInjection(t *testing.T) {
@@ -460,6 +465,33 @@ func TestVersionEndpoint(t *testing.T) {
 	}
 }
 
+func TestStatusEndpoint(t *testing.T) {
+	app := fiber.New()
+	mockSvc := &MockWhoisService{}
+	h := handler.New(mockSvc)
+	h.SetupOpenAPI(app)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/system/status", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("Status request failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	var res struct {
+		Status string `json:"status"`
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if err := json.Unmarshal(body, &res); err != nil {
+		t.Fatalf("Failed to parse status response JSON: %v", err)
+	}
+	if res.Status != "reachable" {
+		t.Errorf("Expected status 'reachable', got %s", res.Status)
+	}
+}
+
 func TestGetAvailablePluginsRealService(t *testing.T) {
 	handler.SetPlugins([]pluginBase.Plugin{
 		newMockPlugin("mikrotik", "Mikrotik address-list"),
@@ -488,3 +520,68 @@ func TestGetAvailablePluginsRealService(t *testing.T) {
 		t.Errorf("Expected json and htaccess in available plugins, got %+v", pluginsList)
 	}
 }
+
+type roundTripFunc func(req *http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestCheckRipeStatusRealService(t *testing.T) {
+	// 1. Reachable
+	clientOk := &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"status":"ok"}`)),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
+	svcOk := handler.NewWhoisServiceWithClient(clientOk)
+	if status := svcOk.CheckRipeStatus(context.Background()); status != "reachable" {
+		t.Errorf("Expected status 'reachable', got '%s'", status)
+	}
+
+	// 2. Fail (HTTP 500)
+	client500 := &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusInternalServerError,
+				Body:       io.NopCloser(strings.NewReader(`{"status":"error"}`)),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
+	svc500 := handler.NewWhoisServiceWithClient(client500)
+	if status := svc500.CheckRipeStatus(context.Background()); status != "fail" {
+		t.Errorf("Expected status 'fail', got '%s'", status)
+	}
+
+	// 3. Fail (200 OK but status != "ok")
+	clientNotOk := &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"status":"maintenance"}`)),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
+	svcNotOk := handler.NewWhoisServiceWithClient(clientNotOk)
+	if status := svcNotOk.CheckRipeStatus(context.Background()); status != "fail" {
+		t.Errorf("Expected status 'fail', got '%s'", status)
+	}
+
+	// 4. Unreachable (Network error)
+	clientNetErr := &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return nil, fmt.Errorf("dial tcp 193.0.6.139:443: connect: connection refused")
+		}),
+	}
+	svcNetErr := handler.NewWhoisServiceWithClient(clientNetErr)
+	if status := svcNetErr.CheckRipeStatus(context.Background()); status != "unreachable" {
+		t.Errorf("Expected status 'unreachable', got '%s'", status)
+	}
+}
+

@@ -34,6 +34,12 @@ export interface SystemVersionResponse {
   version: string;
 }
 
+export type BackendRipeStatus = 'reachable' | 'unreachable' | 'fail' | 'checking';
+
+export interface SystemStatusResponse {
+  status: 'reachable' | 'unreachable' | 'fail';
+}
+
 export type IpVersionOption = 'any' | 'ipv4' | 'ipv6';
 export type AccessTypeOption = 'allow' | 'deny';
 
