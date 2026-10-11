@@ -1,10 +1,7 @@
 name: ip-hub
 services:
   ip-hub:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ip_hub
+    image: ghcr.io/kzeedev/ip_hub:latest
     ports:
       - "${PORT}:${PORT}"
     environment:
