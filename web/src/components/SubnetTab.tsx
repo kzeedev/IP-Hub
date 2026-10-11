@@ -3,6 +3,7 @@ import { Card, Descriptions, Tag, Typography, Space, theme, Empty } from 'antd';
 import { CalculatorOutlined, CodeOutlined } from '@ant-design/icons';
 import { SubnetBreakdown } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
+import { formatHostsCount } from '../utils/helpers';
 
 const { Text, Paragraph } = Typography;
 
@@ -100,14 +101,14 @@ export const SubnetTab: React.FC<SubnetTabProps> = ({ subnet, cidr }) => {
     {
       key: 'totalHosts',
       label: t.subnetTab.totalHosts,
-      children: <Text strong>{subnet.totalHosts} IPs</Text>,
+      children: <Text strong>{formatHostsCount(subnet.totalHosts)} IPs</Text>,
     },
     {
       key: 'usableHosts',
       label: t.subnetTab.usableHosts,
       children: (
         <Text strong style={{ color: '#52c41a' }}>
-          {subnet.usableHosts}
+          {formatHostsCount(subnet.usableHosts)}
         </Text>
       ),
     },

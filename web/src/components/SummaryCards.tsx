@@ -11,6 +11,7 @@ import { getCountryName } from '../utils/countries';
 import { getRouteUrl } from '../utils/router';
 import { FlagIcon } from './FlagIcon';
 import { useLanguage } from '../i18n/LanguageContext';
+import { estimateCidrCapacity } from '../utils/helpers';
 
 const { Text, Title, Paragraph } = Typography;
 
@@ -118,7 +119,7 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
             </div>
             <div style={{ marginTop: 12, paddingTop: 8, borderTop: `1px solid ${token.colorBorderSecondary}`, display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
               <Text type="secondary">{t.summary.capacity}:</Text>
-              <Text strong>{record.subnet?.usableHosts?.toLocaleString() || '1'} {t.summary.hosts}</Text>
+              <Text strong>{estimateCidrCapacity(record.cidr, record.subnet?.usableHosts)} {t.summary.hosts}</Text>
             </div>
           </Card>
         </BorderBeam>
@@ -178,7 +179,10 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
             </div>
             <div style={{ marginTop: 12, paddingTop: 8, borderTop: `1px solid ${token.colorBorderSecondary}`, display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
               <Text type="secondary">{t.routingTab.lookingGlassTitle}:</Text>
-              <Text strong>{record.routing.risPeersSeen} {t.summary.peers}</Text>
+              <Text strong>
+                {record.routing.risPeersSeen || 0}
+                {record.routing.totalRisPeers > 0 ? ` / ${record.routing.totalRisPeers}` : ''} {t.summary.peers}
+              </Text>
             </div>
           </Card>
         </BorderBeam>

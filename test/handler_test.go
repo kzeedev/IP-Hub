@@ -182,6 +182,17 @@ func TestComputeSubnet(t *testing.T) {
 		t.Errorf("Expected valid IPv6 breakdown, got %+v", res6)
 	}
 
+	// IPv4 Range string (e.g. 193.0.0.0 - 193.0.7.255 -> /21 with 2046 usable hosts)
+	resRange := handler.ComputeSubnet("193.0.0.0 - 193.0.7.255", nil)
+	if resRange == nil || resRange.PrefixLength != 21 || resRange.UsableHosts != "2046" {
+		t.Errorf("Expected range to resolve to /21 with 2046 usable hosts, got %+v", resRange)
+	}
+
+	cidrConverted := handler.IpRangeToCIDR("193.0.0.0 - 193.0.7.255")
+	if cidrConverted != "193.0.0.0/21" {
+		t.Errorf("Expected 193.0.0.0/21, got %s", cidrConverted)
+	}
+
 	// Invalid input
 	if invalid := handler.ComputeSubnet("not-an-ip", nil); invalid != nil {
 		t.Errorf("Expected nil for invalid input, got %+v", invalid)

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/bits"
 	"net"
 	"net/http"
 	"net/url"
@@ -112,6 +113,35 @@ func (s *whoisService) IsAsnQuery(q string) bool {
 	return IsAsnQuery(q)
 }
 
+// IpRangeToCIDR converts an IPv4 range (e.g. "193.0.0.0 - 193.0.7.255") to CIDR if it aligns to a valid network block.
+func IpRangeToCIDR(rangeStr string) string {
+	parts := strings.Split(rangeStr, "-")
+	if len(parts) != 2 {
+		return ""
+	}
+	startIP := net.ParseIP(strings.TrimSpace(parts[0])).To4()
+	endIP := net.ParseIP(strings.TrimSpace(parts[1])).To4()
+	if startIP == nil || endIP == nil {
+		return ""
+	}
+	startUint := binary.BigEndian.Uint32(startIP)
+	endUint := binary.BigEndian.Uint32(endIP)
+	if endUint < startUint {
+		return ""
+	}
+	count := uint64(endUint - startUint + 1)
+	if count > 0 && (count&(count-1)) == 0 {
+		trailing := bits.TrailingZeros64(count)
+		if trailing <= 32 {
+			shift := uint32(1 << trailing)
+			if shift > 0 && startUint%shift == 0 {
+				return fmt.Sprintf("%s/%d", startIP.String(), 32-trailing)
+			}
+		}
+	}
+	return ""
+}
+
 // ComputeSubnet calculates network bounds, host counts, and addresses for an IPv4/IPv6 input.
 func ComputeSubnet(input string, customCidr *int) *models.SubnetBreakdown {
 	trimmed := strings.TrimSpace(input)
@@ -126,6 +156,11 @@ func ComputeSubnet(input string, customCidr *int) *models.SubnetBreakdown {
 			return nil
 		}
 		prefix = p
+	} else if strings.Contains(trimmed, "-") {
+		if c := IpRangeToCIDR(trimmed); c != "" {
+			return ComputeSubnet(c, customCidr)
+		}
+		return nil
 	} else {
 		ipStr = trimmed
 		if customCidr != nil {
@@ -483,39 +518,85 @@ func (s *whoisService) LookupIP(rawQuery string) (*models.WhoisRecord, error) {
 	wg.Go(func() {
 		var routRes struct {
 			Data struct {
+				Resource  string `json:"resource"`
 				Prefix    string `json:"prefix"`
 				Announced bool   `json:"announced"`
 				Origins   []struct {
-					Origin string `json:"origin"`
+					Origin interface{} `json:"origin"`
 				} `json:"origins"`
 				Visibility struct {
 					V4 struct {
-						RisPeersSeen  int `json:"ris_peers_seen"`
-						TotalRisPeers int `json:"total_ris_peers"`
+						RisPeersSeeing int `json:"ris_peers_seeing"`
+						RisPeersSeen   int `json:"ris_peers_seen"`
+						TotalRisPeers  int `json:"total_ris_peers"`
 					} `json:"v4"`
 					V6 struct {
-						RisPeersSeen  int `json:"ris_peers_seen"`
-						TotalRisPeers int `json:"total_ris_peers"`
+						RisPeersSeeing int `json:"ris_peers_seeing"`
+						RisPeersSeen   int `json:"ris_peers_seen"`
+						TotalRisPeers  int `json:"total_ris_peers"`
 					} `json:"v6"`
 				} `json:"visibility"`
 				LastUpdated string `json:"last_updated"`
+				QueryTime   string `json:"query_time"`
+				LastSeen    struct {
+					Prefix string `json:"prefix"`
+					Time   string `json:"time"`
+				} `json:"last_seen"`
 			} `json:"data"`
 		}
 		u := fmt.Sprintf("https://stat.ripe.net/data/routing-status/data.json?resource=%s", url.QueryEscape(query))
 		if err := s.fetchJSON(u, &routRes); err == nil {
-			routing.AnnouncedPrefix = routRes.Data.Prefix
+			if routRes.Data.Prefix != "" {
+				routing.AnnouncedPrefix = routRes.Data.Prefix
+			} else if routRes.Data.Resource != "" {
+				routing.AnnouncedPrefix = routRes.Data.Resource
+			} else if routRes.Data.LastSeen.Prefix != "" {
+				routing.AnnouncedPrefix = routRes.Data.LastSeen.Prefix
+			}
+
 			routing.IsAnnounced = routRes.Data.Announced || len(routRes.Data.Origins) > 0
 			if len(routRes.Data.Origins) > 0 {
-				routing.OriginAsn = "AS" + routRes.Data.Origins[0].Origin
+				var originStr string
+				switch v := routRes.Data.Origins[0].Origin.(type) {
+				case float64:
+					originStr = strconv.FormatInt(int64(v), 10)
+				case int:
+					originStr = strconv.Itoa(v)
+				case string:
+					originStr = strings.TrimSpace(v)
+				}
+				if originStr != "" {
+					if !strings.HasPrefix(strings.ToUpper(originStr), "AS") {
+						routing.OriginAsn = "AS" + originStr
+					} else {
+						routing.OriginAsn = strings.ToUpper(originStr)
+					}
+				}
 			}
-			peersSeen := routRes.Data.Visibility.V4.RisPeersSeen + routRes.Data.Visibility.V6.RisPeersSeen
+
+			v4Seen := routRes.Data.Visibility.V4.RisPeersSeeing
+			if v4Seen == 0 {
+				v4Seen = routRes.Data.Visibility.V4.RisPeersSeen
+			}
+			v6Seen := routRes.Data.Visibility.V6.RisPeersSeeing
+			if v6Seen == 0 {
+				v6Seen = routRes.Data.Visibility.V6.RisPeersSeen
+			}
+			peersSeen := v4Seen + v6Seen
+
 			totalPeers := routRes.Data.Visibility.V4.TotalRisPeers + routRes.Data.Visibility.V6.TotalRisPeers
 			routing.RisPeersSeen = peersSeen
 			routing.TotalRisPeers = totalPeers
 			if totalPeers > 0 {
 				routing.BgpVisibilityPercentage = int(math.Round(float64(peersSeen) / float64(totalPeers) * 100))
 			}
-			routing.LastUpdated = routRes.Data.LastUpdated
+			if routRes.Data.LastUpdated != "" {
+				routing.LastUpdated = routRes.Data.LastUpdated
+			} else if routRes.Data.QueryTime != "" {
+				routing.LastUpdated = routRes.Data.QueryTime
+			} else if routRes.Data.LastSeen.Time != "" {
+				routing.LastUpdated = routRes.Data.LastSeen.Time
+			}
 		}
 	})
 
@@ -615,6 +696,11 @@ func (s *whoisService) LookupIP(rawQuery string) (*models.WhoisRecord, error) {
 
 	for _, obj := range objects {
 		isNetObj := obj.Type == "inetnum" || obj.Type == "inet6num" || obj.Type == "netrange"
+		if isNetObj && obj.PrimaryKey != "" {
+			if rangeStr == query || rangeStr == "" {
+				rangeStr = obj.PrimaryKey
+			}
+		}
 		for _, a := range obj.Attributes {
 			k := strings.ToLower(a.Name)
 			v := a.Value
@@ -691,12 +777,37 @@ func (s *whoisService) LookupIP(rawQuery string) (*models.WhoisRecord, error) {
 		routing.IsAnnounced = true
 	}
 
-	subnet := ComputeSubnet(query, nil)
-	cidr := query
+	// Resolve allocated CIDR prefix
+	cidr := ""
 	if netPrefix != "" {
 		cidr = netPrefix
-	} else if subnet != nil {
-		cidr = subnet.CIDR
+	} else if routing.AnnouncedPrefix != "" {
+		cidr = routing.AnnouncedPrefix
+	} else if strings.Contains(rangeStr, "/") {
+		cidr = rangeStr
+	} else if strings.Contains(rangeStr, "-") {
+		if c := IpRangeToCIDR(rangeStr); c != "" {
+			cidr = c
+		}
+	}
+
+	if cidr == "" {
+		cidr = query
+	}
+
+	// Compute subnet breakdown for the allocated network block
+	subnet := ComputeSubnet(cidr, nil)
+	if subnet == nil && cidr != query {
+		subnet = ComputeSubnet(query, nil)
+	}
+
+	// Ensure rangeStr reflects the allocated range bounds
+	if (rangeStr == query || rangeStr == "") && subnet != nil {
+		if subnet.IPVersion == 4 && subnet.NetworkAddress != "" && subnet.BroadcastAddress != "" {
+			rangeStr = fmt.Sprintf("%s - %s", subnet.NetworkAddress, subnet.BroadcastAddress)
+		} else {
+			rangeStr = subnet.CIDR
+		}
 	}
 
 	if countryCode != "XX" && countryCode != "" {
@@ -718,8 +829,13 @@ func (s *whoisService) LookupIP(rawQuery string) (*models.WhoisRecord, error) {
 	}
 
 	record := &models.WhoisRecord{
-		Query:           query,
-		QueryType:       "ipv4",
+		Query: query,
+		QueryType: func() string {
+			if strings.Contains(query, ":") {
+				return "ipv6"
+			}
+			return "ipv4"
+		}(),
 		NormalizedQuery: strings.ToLower(query),
 		Netname:         netname,
 		Range:           rangeStr,

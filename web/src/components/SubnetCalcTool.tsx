@@ -3,6 +3,7 @@ import { Card, Row, Col, Input, Slider, Descriptions, Typography, Space, theme, 
 import { CalculatorOutlined, NumberOutlined, CodeOutlined } from '@ant-design/icons';
 import { SubnetBreakdown } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
+import { formatHostsCount } from '../utils/helpers';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -99,14 +100,14 @@ export const SubnetCalcTool: React.FC = () => {
         {
           key: 'totalHosts',
           label: t.subnetCalc.totalHosts,
-          children: <Text strong>{data.totalHosts}</Text>,
+          children: <Text strong>{formatHostsCount(data.totalHosts)}</Text>,
         },
         {
           key: 'usableHosts',
           label: t.subnetCalc.usableHosts,
           children: (
             <Text strong style={{ color: '#52c41a' }}>
-              {data.usableHosts}
+              {formatHostsCount(data.usableHosts)}
             </Text>
           ),
         },
