@@ -379,7 +379,7 @@ export const translations = {
       "section3Text": "Network administrators and security engineers use country IP lists to protect critical infrastructure, enforce geographic access policies, reduce DDoS attack surfaces, and optimize traffic routing.",
       "keywordsTitle": "Related Network & GeoIP Topics:",
       "subheading": "Authoritative GeoIP, RIPEstat & Firewall Configuration Resource",
-      "guideBadge": "v2.0 Guide",
+      "guideBadge": "v2.1 Guide",
       "readGuide": "Read Guide & Details",
       "hideGuide": "Hide Guide & Details"
     },
@@ -810,7 +810,7 @@ export const translations = {
       "section3Text": "مدیران شبکه و متخصصان امنیت با استفاده از لیست IP کشورها می‌توانند سیاست‌های دسترسی جغرافیایی را روی روترها اعمال کنند، حملات DDoS را محدود سازند و امنیت سرورها را افزایش دهند.",
       "keywordsTitle": "کلمات کلیدی و مباحث مرتبط با شبکه:",
       "subheading": "مرجع معتبر داده‌های GeoIP، استعلام RIPEstat و کانفیگ فایروال",
-      "guideBadge": "راهنمای نسخه ۲",
+      "guideBadge": "راهنمای نسخه ۲.۱",
       "readGuide": "مشاهده راهنما و توضیحات",
       "hideGuide": "بستن راهنما و توضیحات"
     },

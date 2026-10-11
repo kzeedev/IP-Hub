@@ -430,6 +430,36 @@ func TestPluginsEndpoint(t *testing.T) {
 	}
 }
 
+func TestVersionEndpoint(t *testing.T) {
+	app := fiber.New()
+	mockSvc := &MockWhoisService{}
+	h := handler.New(mockSvc)
+	h.SetupOpenAPI(app)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/system/version", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("Version request failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	var res struct {
+		Version string `json:"version"`
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if err := json.Unmarshal(body, &res); err != nil {
+		t.Fatalf("Failed to parse version response JSON: %v", err)
+	}
+	if res.Version == "" {
+		t.Errorf("Expected non-empty version, got empty string")
+	}
+	if !strings.HasPrefix(res.Version, "v") && res.Version != "dev" {
+		t.Errorf("Expected version to start with 'v' or be 'dev', got %s", res.Version)
+	}
+}
+
 func TestGetAvailablePluginsRealService(t *testing.T) {
 	handler.SetPlugins([]pluginBase.Plugin{
 		newMockPlugin("mikrotik", "Mikrotik address-list"),

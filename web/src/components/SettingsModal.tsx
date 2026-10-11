@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Button, Typography, Space, Switch, Tag, Badge, theme } from 'antd';
 import {
   SettingOutlined,
@@ -9,8 +9,9 @@ import {
 } from '@ant-design/icons';
 import { useLanguage } from '../i18n/LanguageContext';
 import { LanguageSelector } from './LanguageSelector';
+import { SystemVersionResponse } from '../types';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 
 interface SettingsModalProps {
   isDarkTheme: boolean;
@@ -21,6 +22,28 @@ interface SettingsModalProps {
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isDarkTheme, onToggleTheme, onClose }) => {
   const { t } = useLanguage();
   const { token } = theme.useToken();
+  const [version, setVersion] = useState<string>('dev');
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch('/api/system/version')
+      .then((res) => {
+        if (res.ok) return res.json();
+        throw new Error('Failed to fetch backend version');
+      })
+      .then((data: SystemVersionResponse) => {
+        if (isMounted && data?.version) {
+          const formatted = data.version.startsWith('v') ? data.version : `v${data.version}`;
+          setVersion(formatted);
+        }
+      })
+      .catch(() => {
+        // Fallback to initial build-time/git version
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <div style={{ maxWidth: 580, margin: '32px auto', padding: '0 16px' }}>
@@ -50,7 +73,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isDarkTheme, onTog
               </div>
             </Space>
             <Tag color="success" variant="filled" style={{ fontWeight: 700, fontFamily: 'monospace' }}>
-              v2.0.0
+              {version}
             </Tag>
           </div>
         }
@@ -73,7 +96,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isDarkTheme, onTog
                   <Text strong>{t.settingsModal.connected}</Text>
                 </div>
               </Space>
-              <Badge status="processing" text={<Text strong style={{ color: '#52c41a', fontFamily: 'monospace' }}>200 OK</Text>} />
+              <Space orientation="horizontal" size={8} align="center">
+                <Badge status="processing" text={<Text strong style={{ color: '#52c41a', fontFamily: 'monospace' }}>200 OK</Text>} />
+              </Space>
             </div>
           </Card>
 

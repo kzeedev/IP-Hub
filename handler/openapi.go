@@ -76,6 +76,16 @@ type SystemPluginsOutput struct {
 	}
 }
 
+// SystemVersionInput represents input for getting application version
+type SystemVersionInput struct{}
+
+// SystemVersionOutput represents application and API version info
+type SystemVersionOutput struct {
+	Body struct {
+		Version string `json:"version" doc:"Current running application and API version" example:"v2.1.3"`
+	}
+}
+
 // WhoisResolveOrgsInput represents input for bulk organization resolution
 type WhoisResolveOrgsInput struct {
 	Body struct {
@@ -121,11 +131,7 @@ type WhoisSubnetOutput struct {
 
 // SetupOpenAPI registers OpenAPI 3.1 endpoints and documentation routes.
 func (h *Handler) SetupOpenAPI(app *fiber.App) huma.API {
-	version := config.Version
-	if version == "" {
-		version = "1.0.0"
-	}
-
+	version := config.GetVersion()
 	humaConfig := huma.DefaultConfig("IP-Hub API", version)
 	humaConfig.OpenAPI.Info.Description = "Real-time WHOIS intelligence, country IP allocations, BGP routing inspection, and network utility tools powered by GoFiber and Huma."
 	humaConfig.OpenAPI.Info.License = &huma.License{
@@ -294,6 +300,19 @@ func (h *Handler) SetupOpenAPI(app *fiber.App) huma.API {
 		pluginsList := h.svc.GetAvailablePlugins()
 		resp := &SystemPluginsOutput{}
 		resp.Body.Plugins = pluginsList
+		return resp, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "system-version",
+		Method:      http.MethodGet,
+		Path:        "/api/system/version",
+		Summary:     "Get Application Version",
+		Description: "Returns the current deployed application and API version of IP-Hub.",
+		Tags:        []string{"System"},
+	}, func(ctx context.Context, input *SystemVersionInput) (*SystemVersionOutput, error) {
+		resp := &SystemVersionOutput{}
+		resp.Body.Version = config.GetVersion()
 		return resp, nil
 	})
 

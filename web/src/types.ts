@@ -30,6 +30,10 @@ export interface SystemPluginsResponse {
   plugins: PluginFormat[];
 }
 
+export interface SystemVersionResponse {
+  version: string;
+}
+
 export type IpVersionOption = 'any' | 'ipv4' | 'ipv6';
 export type AccessTypeOption = 'allow' | 'deny';
 

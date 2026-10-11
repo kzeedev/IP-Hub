@@ -63,7 +63,7 @@ func init() {
 
 	// Configure Fiber with body size limit
 	app = fiber.New(fiber.Config{
-		AppName:   fmt.Sprintf("IP-Hub %s", config.Version),
+		AppName:   fmt.Sprintf("IP-Hub %s", config.GetVersion()),
 		BodyLimit: 2 * 1024 * 1024,
 	})
 
