@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/kzeedev/IP-Hub/handler"
@@ -18,14 +19,14 @@ import (
 
 // MockWhoisService implements handler.WhoisService for testing.
 type MockWhoisService struct {
-	LookupIPFunc        func(query string) (*models.WhoisRecord, error)
-	ResolveClientIPFunc func(clientIP string) string
-	LookupASNFunc       func(query string) (*models.AsnRecord, error)
-	IsAsnQueryFunc      func(q string) bool
-	LookupCountryFunc   func(code string) (*models.CountryIpResource, error)
-	ResolveOrgsFunc     func(asns []interface{}, prefixes []string) map[string]string
-	ComputeSubnetFunc   func(input string, customCidr *int) *models.SubnetBreakdown
-	BatchLookupFunc     func(items []string) []models.BatchItemResult
+	LookupIPFunc            func(query string) (*models.WhoisRecord, error)
+	ResolveClientIPFunc     func(clientIP string) string
+	LookupASNFunc           func(query string) (*models.AsnRecord, error)
+	IsAsnQueryFunc          func(q string) bool
+	LookupCountryFunc       func(code string) (*models.CountryIpResource, error)
+	GetResolverStatusFunc   func() models.ResolverStatusResponse
+	ComputeSubnetFunc       func(input string, customCidr *int) *models.SubnetBreakdown
+	BatchLookupFunc         func(items []string) []models.BatchItemResult
 	FormatCountryFunc       func(resource *models.CountryIpResource, format, version, access, listName string) *models.FormatResult
 	GetAvailablePluginsFunc func() []models.PluginInfo
 }
@@ -65,11 +66,15 @@ func (m *MockWhoisService) LookupCountry(code string) (*models.CountryIpResource
 	return &models.CountryIpResource{CountryCode: code, CountryName: "Mockland"}, nil
 }
 
-func (m *MockWhoisService) ResolveOrgs(asns []interface{}, prefixes []string) map[string]string {
-	if m.ResolveOrgsFunc != nil {
-		return m.ResolveOrgsFunc(asns, prefixes)
+func (m *MockWhoisService) GetResolverStatus() models.ResolverStatusResponse {
+	if m.GetResolverStatusFunc != nil {
+		return m.GetResolverStatusFunc()
 	}
-	return map[string]string{"AS13335": "Cloudflare"}
+	return models.ResolverStatusResponse{
+		Active:    []models.ActiveCountryJob{},
+		Waiting:   []models.QueuedCountry{},
+		Completed: []string{},
+	}
 }
 
 func (m *MockWhoisService) ComputeSubnet(input string, customCidr *int) *models.SubnetBreakdown {
@@ -596,3 +601,97 @@ func TestCheckRipeStatusRealService(t *testing.T) {
 	}
 }
 
+func TestSystemResolversEndpoint(t *testing.T) {
+	mockSvc := &MockWhoisService{
+		GetResolverStatusFunc: func() models.ResolverStatusResponse {
+			return models.ResolverStatusResponse{
+				Active: []models.ActiveCountryJob{
+					{
+						CountryCode: "IR",
+						CountryName: "Iran",
+						ASN:         models.CategoryProgress{Total: 100, Resolved: 50, Percent: 50},
+						IPv4:        models.CategoryProgress{Total: 200, Resolved: 100, Percent: 50},
+						IPv6:        models.CategoryProgress{Total: 20, Resolved: 20, Percent: 100},
+					},
+				},
+				Waiting: []models.QueuedCountry{
+					{
+						CountryCode: "DE",
+						CountryName: "Germany",
+					},
+				},
+				Completed: []string{"US"},
+			}
+		},
+	}
+
+	app := fiber.New()
+	h := handler.New(mockSvc)
+	h.SetupOpenAPI(app)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/system/resolvers", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("Failed to execute request: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	var body struct {
+		Active    []models.ActiveCountryJob `json:"active"`
+		Waiting   []models.QueuedCountry    `json:"waiting"`
+		Completed []string                  `json:"completed"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if len(body.Active) != 1 || body.Active[0].CountryCode != "IR" {
+		t.Errorf("Expected 1 active country IR, got: %+v", body.Active)
+	}
+	if len(body.Waiting) != 1 || body.Waiting[0].CountryCode != "DE" {
+		t.Errorf("Expected 1 waiting country DE, got: %+v", body.Waiting)
+	}
+	if len(body.Completed) != 1 || body.Completed[0] != "US" {
+		t.Errorf("Expected 1 completed country US, got: %+v", body.Completed)
+	}
+}
+
+func TestCountryNameResolverQueueAndConcurrency(t *testing.T) {
+	mockClient := &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			time.Sleep(100 * time.Millisecond)
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"data":{"names":{}}}`)),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
+
+	resolver := handler.NewCountryNameResolver(mockClient)
+
+	// Enqueue 7 countries: 3 active, 3 queued, 7th rejected (queue full)
+	resolver.Enqueue("US", "United States", []int{1, 2}, []string{"1.0.0.0/24"}, []string{"2001:db8::/32"})
+	resolver.Enqueue("DE", "Germany", []int{3, 4}, []string{"2.0.0.0/24"}, []string{"2001:db8:1::/32"})
+	resolver.Enqueue("FR", "France", []int{5, 6}, []string{"3.0.0.0/24"}, []string{"2001:db8:2::/32"})
+	resolver.Enqueue("JP", "Japan", []int{7, 8}, []string{"4.0.0.0/24"}, []string{"2001:db8:3::/32"})
+	resolver.Enqueue("CA", "Canada", []int{9, 10}, []string{"5.0.0.0/24"}, []string{"2001:db8:4::/32"})
+	resolver.Enqueue("GB", "United Kingdom", []int{11, 12}, []string{"6.0.0.0/24"}, []string{"2001:db8:5::/32"})
+
+	// 7th country should hit queue limit
+	enq, queueFull := resolver.Enqueue("IT", "Italy", []int{13, 14}, []string{"7.0.0.0/24"}, []string{"2001:db8:6::/32"})
+	if enq || !queueFull {
+		t.Errorf("Expected 7th country to be rejected due to full queue, got enq=%v, queueFull=%v", enq, queueFull)
+	}
+
+	status := resolver.GetStatus()
+	if len(status.Active) != 3 {
+		t.Errorf("Expected 3 active countries, got %d", len(status.Active))
+	}
+	if len(status.Waiting) != 3 {
+		t.Errorf("Expected 3 waiting countries (queue limit), got %d", len(status.Waiting))
+	}
+}

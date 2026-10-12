@@ -36,9 +36,9 @@ type ASNLookupService interface {
 // CountryResourceService defines country IP and ASN delegation operations.
 type CountryResourceService interface {
 	LookupCountry(code string) (*models.CountryIpResource, error)
-	ResolveOrgs(asns []interface{}, prefixes []string) map[string]string
 	FormatCountry(resource *models.CountryIpResource, format, version, access, listName string) *models.FormatResult
 	GetAvailablePlugins() []models.PluginInfo
+	GetResolverStatus() models.ResolverStatusResponse
 }
 
 // SubnetCalculatorService defines subnet and CIDR breakdown operations.
@@ -63,8 +63,8 @@ type WhoisService interface {
 
 // whoisService is the concrete implementation of WhoisService.
 type whoisService struct {
-	httpClient         *http.Client
-	countryBgResolving sync.Map
+	httpClient      *http.Client
+	countryResolver *CountryNameResolver
 }
 
 // NewWhoisService creates a new WhoisService with standard timeouts.
@@ -80,7 +80,8 @@ func NewWhoisServiceWithClient(client *http.Client) WhoisService {
 		client = &http.Client{Timeout: 7 * time.Second}
 	}
 	return &whoisService{
-		httpClient: client,
+		httpClient:      client,
+		countryResolver: NewCountryNameResolver(client),
 	}
 }
 
@@ -987,7 +988,13 @@ func (s *whoisService) LookupCountry(code string) (*models.CountryIpResource, er
 	var cached models.CountryIpResource
 	if found, _ := database.GetJSON(cacheKey, &cached); found {
 		cached.Cached = true
-		go s.startBackgroundCountryIspResolution(code, cached.ASNs, cached.IPv4, cached.IPv6)
+		totalExpected := len(cached.IPv4) + len(cached.IPv6)
+		if s.countryResolver != nil && (len(cached.AsNames) < len(cached.ASNs) || len(cached.PrefixOrgs) < totalExpected) {
+			_, queueFull := s.countryResolver.Enqueue(code, cached.CountryName, cached.ASNs, cached.IPv4, cached.IPv6)
+			cached.ResolverQueueFull = queueFull
+		} else if s.countryResolver != nil {
+			s.countryResolver.MarkCompleted(code)
+		}
 		return &cached, nil
 	}
 
@@ -1079,7 +1086,10 @@ func (s *whoisService) LookupCountry(code string) (*models.CountryIpResource, er
 
 	_ = database.SetJSON(cacheKey, result, dailyTtl)
 
-	go s.startBackgroundCountryIspResolution(code, asns, ripeStatRes.Data.Resources.Ipv4, ripeStatRes.Data.Resources.Ipv6)
+	if s.countryResolver != nil {
+		_, queueFull := s.countryResolver.Enqueue(code, countryName, asns, ripeStatRes.Data.Resources.Ipv4, ripeStatRes.Data.Resources.Ipv6)
+		result.ResolverQueueFull = queueFull
+	}
 
 	return &result, nil
 }
@@ -1205,204 +1215,16 @@ func (s *whoisService) FormatCountry(resource *models.CountryIpResource, format,
 	}
 }
 
-func (s *whoisService) startBackgroundCountryIspResolution(countryCode string, asns []int, ipv4 []string, ipv6 []string) {
-	if _, loaded := s.countryBgResolving.LoadOrStore(countryCode, true); loaded {
-		return
-	}
-	defer s.countryBgResolving.Delete(countryCode)
-
-	dailyTtl := getEndOfDayTtl()
-	cacheKey := "country_res_" + countryCode
-
-	if len(asns) > 100 {
-		asns = asns[:100]
-	}
-
-	var missingAsns []string
-	for _, asn := range asns {
-		asnStr := strconv.Itoa(asn)
-		var val string
-		if found, _ := database.GetJSON("asn_name_"+asnStr, &val); !found || val == "" {
-			missingAsns = append(missingAsns, asnStr)
+// GetResolverStatus returns current active and waiting country name resolution status.
+func (s *whoisService) GetResolverStatus() models.ResolverStatusResponse {
+	if s.countryResolver == nil {
+		return models.ResolverStatusResponse{
+			Active:    []models.ActiveCountryJob{},
+			Waiting:   []models.QueuedCountry{},
+			Completed: []string{},
 		}
 	}
-
-	const asnChunkSize = 50
-	for i := 0; i < len(missingAsns); i += asnChunkSize {
-		end := min(i+asnChunkSize, len(missingAsns))
-		chunk := missingAsns[i:end]
-
-		var asRes struct {
-			Data struct {
-				Names map[string]string `json:"names"`
-			} `json:"data"`
-		}
-		u := fmt.Sprintf("https://stat.ripe.net/data/as-names/data.json?resource=%s", strings.Join(chunk, ","))
-		if err := s.fetchJSON(u, &asRes); err == nil && asRes.Data.Names != nil {
-			for k, v := range asRes.Data.Names {
-				_ = database.SetJSON("asn_name_"+k, v, dailyTtl)
-				_ = database.SetJSON("asn_name_AS"+k, v, dailyTtl)
-			}
-
-			var res models.CountryIpResource
-			if found, _ := database.GetJSON(cacheKey, &res); found {
-				if res.AsNames == nil {
-					res.AsNames = make(map[string]string)
-				}
-				for k, v := range asRes.Data.Names {
-					res.AsNames["AS"+k] = v
-					res.AsNames[k] = v
-				}
-				_ = database.SetJSON(cacheKey, res, dailyTtl)
-			}
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-
-	allPrefixes := append([]string{}, ipv4...)
-	allPrefixes = append(allPrefixes, ipv6...)
-	const maxPrefixResolution = 100
-	if len(allPrefixes) > maxPrefixResolution {
-		allPrefixes = allPrefixes[:maxPrefixResolution]
-	}
-
-	var missingPrefixes []string
-	for _, p := range allPrefixes {
-		var val string
-		if found, _ := database.GetJSON("prefix_org_"+p, &val); !found || val == "" {
-			missingPrefixes = append(missingPrefixes, p)
-		}
-	}
-
-	if len(missingPrefixes) == 0 {
-		return
-	}
-
-	workerCount := 4
-	prefixChan := make(chan string, len(missingPrefixes))
-	for _, p := range missingPrefixes {
-		prefixChan <- p
-	}
-	close(prefixChan)
-
-	var wg sync.WaitGroup
-
-	for range workerCount {
-		wg.Go(func() {
-			for prefix := range prefixChan {
-				var pRes struct {
-					Data struct {
-						Asns []struct {
-							Holder string `json:"holder"`
-						} `json:"asns"`
-					} `json:"data"`
-				}
-				u := fmt.Sprintf("https://stat.ripe.net/data/prefix-overview/data.json?resource=%s", url.QueryEscape(prefix))
-				if err := s.fetchJSON(u, &pRes); err == nil && len(pRes.Data.Asns) > 0 && pRes.Data.Asns[0].Holder != "" {
-					holder := pRes.Data.Asns[0].Holder
-					_ = database.SetJSON("prefix_org_"+prefix, holder, dailyTtl)
-
-					var res models.CountryIpResource
-					if found, _ := database.GetJSON(cacheKey, &res); found {
-						if res.PrefixOrgs == nil {
-							res.PrefixOrgs = make(map[string]string)
-						}
-						res.PrefixOrgs[prefix] = holder
-						_ = database.SetJSON(cacheKey, res, dailyTtl)
-					}
-				}
-				time.Sleep(30 * time.Millisecond)
-			}
-		})
-	}
-	wg.Wait()
-}
-
-// ResolveOrgs bulk resolves organization and ISP names for ASNs and CIDR prefixes.
-func (s *whoisService) ResolveOrgs(asns []interface{}, prefixes []string) map[string]string {
-	dailyTtl := getEndOfDayTtl()
-	orgs := make(map[string]string)
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-
-	var missingAsns []string
-	for _, a := range asns {
-		var str string
-		switch v := a.(type) {
-		case float64:
-			str = strconv.Itoa(int(v))
-		case string:
-			str = strings.TrimPrefix(strings.ToUpper(v), "AS")
-		}
-		if str != "" {
-			var name string
-			if found, _ := database.GetJSON("asn_name_"+str, &name); found && name != "" {
-				orgs["AS"+str] = name
-				orgs[str] = name
-			} else {
-				missingAsns = append(missingAsns, str)
-			}
-		}
-	}
-
-	if len(missingAsns) > 0 {
-		wg.Go(func() {
-			var asRes struct {
-				Data struct {
-					Names map[string]string `json:"names"`
-				} `json:"data"`
-			}
-			u := fmt.Sprintf("https://stat.ripe.net/data/as-names/data.json?resource=%s", strings.Join(missingAsns, ","))
-			if err := s.fetchJSON(u, &asRes); err == nil && asRes.Data.Names != nil {
-				mu.Lock()
-				for k, v := range asRes.Data.Names {
-					orgs["AS"+k] = v
-					orgs[k] = v
-					_ = database.SetJSON("asn_name_"+k, v, dailyTtl)
-					_ = database.SetJSON("asn_name_AS"+k, v, dailyTtl)
-				}
-				mu.Unlock()
-			}
-		})
-	}
-
-	var missingPrefixes []string
-	for _, p := range prefixes {
-		var org string
-		if found, _ := database.GetJSON("prefix_org_"+p, &org); found && org != "" {
-			orgs[p] = org
-		} else {
-			missingPrefixes = append(missingPrefixes, p)
-		}
-	}
-
-	sem := make(chan struct{}, 6)
-	for _, p := range missingPrefixes {
-		prefix := p
-		wg.Go(func() {
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			var pRes struct {
-				Data struct {
-					Asns []struct {
-						Holder string `json:"holder"`
-					} `json:"asns"`
-				} `json:"data"`
-			}
-			u := fmt.Sprintf("https://stat.ripe.net/data/prefix-overview/data.json?resource=%s", url.QueryEscape(prefix))
-			if err := s.fetchJSON(u, &pRes); err == nil && len(pRes.Data.Asns) > 0 && pRes.Data.Asns[0].Holder != "" {
-				holder := pRes.Data.Asns[0].Holder
-				mu.Lock()
-				orgs[prefix] = holder
-				mu.Unlock()
-				_ = database.SetJSON("prefix_org_"+prefix, holder, dailyTtl)
-			}
-		})
-	}
-
-	wg.Wait()
-	return orgs
+	return s.countryResolver.GetStatus()
 }
 
 // BatchLookup inspects up to 50 IP addresses in parallel.

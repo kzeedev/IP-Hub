@@ -96,18 +96,15 @@ type SystemStatusOutput struct {
 	}
 }
 
-// WhoisResolveOrgsInput represents input for bulk organization resolution
-type WhoisResolveOrgsInput struct {
-	Body struct {
-		Prefixes []string      `json:"prefixes" doc:"List of CIDR prefixes to resolve organization names for"`
-		Asns     []interface{} `json:"asns" doc:"List of ASNs (numbers or string format like AS15169) to resolve"`
-	}
-}
+// SystemResolversInput represents input for getting background resolver status
+type SystemResolversInput struct{}
 
-// WhoisResolveOrgsOutput represents mapping of resources to organization names
-type WhoisResolveOrgsOutput struct {
+// SystemResolversOutput represents current status of background name resolving services
+type SystemResolversOutput struct {
 	Body struct {
-		Orgs map[string]string `json:"orgs" doc:"Map of resource identifier (e.g. AS15169 or prefix) to organization name"`
+		Active    []models.ActiveCountryJob `json:"active" doc:"List of countries currently being resolved"`
+		Waiting   []models.QueuedCountry    `json:"waiting" doc:"List of countries waiting in the queue"`
+		Completed []string                  `json:"completed" doc:"List of country codes that have completed name resolution"`
 	}
 }
 
@@ -341,20 +338,21 @@ func (h *Handler) SetupOpenAPI(app *fiber.App) huma.API {
 	})
 
 	huma.Register(api, huma.Operation{
-		OperationID: "whois-resolve-orgs",
-		Method:      http.MethodPost,
-		Path:        "/api/whois/resolve-orgs",
-		Summary:     "Bulk Resolve Organization Names",
-		Description: "Resolves holder and ISP organization names for lists of Autonomous System Numbers (ASNs) and CIDR prefixes.",
-		Tags:        []string{"Country Resources"},
-	}, func(ctx context.Context, input *WhoisResolveOrgsInput) (*WhoisResolveOrgsOutput, error) {
-		if len(input.Body.Prefixes) > 50 || len(input.Body.Asns) > 50 {
-			return nil, huma.Error400BadRequest("Exceeded maximum allowed items: limit is 50 prefixes and 50 ASNs per request")
+		OperationID: "system-resolvers",
+		Method:      http.MethodGet,
+		Path:        "/api/system/resolvers",
+		Summary:     "Get Name Resolving Service Status",
+		Description: "Returns real-time status of the background country name resolving service, including active countries with progress counters and the waiting queue.",
+		Tags:        []string{"System"},
+	}, func(ctx context.Context, input *SystemResolversInput) (*SystemResolversOutput, error) {
+		status := h.svc.GetResolverStatus()
+		resp := &SystemResolversOutput{}
+		resp.Body.Active = status.Active
+		resp.Body.Waiting = status.Waiting
+		resp.Body.Completed = status.Completed
+		if resp.Body.Completed == nil {
+			resp.Body.Completed = []string{}
 		}
-
-		orgs := h.svc.ResolveOrgs(input.Body.Asns, input.Body.Prefixes)
-		resp := &WhoisResolveOrgsOutput{}
-		resp.Body.Orgs = orgs
 		return resp, nil
 	})
 

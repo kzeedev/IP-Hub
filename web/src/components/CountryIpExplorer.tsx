@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useDeferredValue, useCallback } from 'react';
 import {
   Card,
   Row,
@@ -16,6 +16,8 @@ import {
   theme,
   Spin,
   BorderBeam,
+  Badge,
+  notification,
 } from 'antd';
 import {
   GlobalOutlined,
@@ -31,7 +33,16 @@ import {
   SearchOutlined,
   FilterOutlined,
 } from '@ant-design/icons';
-import { CountryIpResource, ExportFormat, IpVersionOption, AccessTypeOption, FormatResult, PluginFormat } from '../types';
+import {
+  CountryIpResource,
+  ExportFormat,
+  IpVersionOption,
+  AccessTypeOption,
+  FormatResult,
+  PluginFormat,
+  ResolverStatusResponse,
+  CountryResolverState,
+} from '../types';
 import { ALL_COUNTRIES, POPULAR_COUNTRIES, getCountryDetails } from '../utils/countries';
 import { copyToClipboard, downloadText } from '../utils/helpers';
 import { getRouteUrl } from '../utils/router';
@@ -84,6 +95,82 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   const [isConfigCopied, setIsConfigCopied] = useState<boolean>(false);
   const [isConfigLoading, setIsConfigLoading] = useState<boolean>(false);
 
+  // Background resolver state polling
+  const [resolverStatus, setResolverStatus] = useState<ResolverStatusResponse | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchStatus = () => {
+      fetch('/api/system/resolvers')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: ResolverStatusResponse | null) => {
+          if (isMounted && data) {
+            setResolverStatus(data);
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchStatus();
+    const intervalTime = (resolverStatus?.active?.length ?? 0) > 0 ? 3000 : 10000;
+    const timer = setInterval(fetchStatus, intervalTime);
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, [resolverStatus?.active?.length]);
+
+  const getCountryState = useCallback(
+    (code: string): CountryResolverState => {
+      const upper = code ? code.trim().toUpperCase() : '';
+      if (!upper) return 'not-resolved';
+      if (resolverStatus?.active?.some((a) => a.countryCode === upper)) return 'resolving';
+      if (resolverStatus?.waiting?.some((w) => w.countryCode === upper)) return 'resolving';
+      if (resolverStatus?.completed?.includes(upper)) return 'completed';
+      if (
+        data?.countryCode === upper &&
+        data.cached &&
+        Object.keys(data.prefixOrgs || {}).length > 0
+      ) {
+        return 'completed';
+      }
+      return 'not-resolved';
+    },
+    [resolverStatus, data]
+  );
+
+  const [notifyApi, notificationContextHolder] = notification.useNotification();
+
+  const showQueueFullNotification = useCallback(() => {
+    notifyApi.warning({
+      message: t.countryExplorer.queueFullTitle || 'Name Resolver Queue Full',
+      description:
+        t.countryExplorer.queueFullDesc ||
+        'The background resolution queue has reached its maximum capacity (3 countries). New country lookups are temporarily paused until ongoing tasks complete.',
+      placement: 'bottomRight',
+      duration: 5,
+    });
+  }, [notifyApi, t.countryExplorer]);
+
+  const renderStatusDot = useCallback(
+    (code: string) => {
+      const state = getCountryState(code);
+      let badgeStatus: 'default' | 'processing' | 'success' = 'default';
+      if (state === 'resolving') badgeStatus = 'processing';
+      else if (state === 'completed') badgeStatus = 'success';
+
+      const title =
+        state === 'resolving'
+          ? t.countryExplorer.statusResolving || 'Resolving'
+          : state === 'completed'
+          ? t.countryExplorer.statusCompleted || 'Completed'
+          : t.countryExplorer.statusNotResolved || 'Not Resolved';
+
+      return <Badge status={badgeStatus} title={title} />;
+    },
+    [getCountryState, t.countryExplorer]
+  );
+
   // Fetch available plugins from backend dynamically on mount
   useEffect(() => {
     let isMounted = true;
@@ -120,7 +207,6 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
 
   // ISP / Organization resolution cache
   const [resolvedOrgs, setResolvedOrgs] = useState<Record<string, string>>({});
-  const [isResolvingOrgs, setIsResolvingOrgs] = useState<boolean>(false);
 
   // Copy feedback for individual table items
   const [copiedItem, setCopiedItem] = useState<string | null>(null);
@@ -154,20 +240,23 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
       }
       const json = await res.json();
       setData(json.data);
+      if (json.data?.resolverQueueFull) {
+        showQueueFullNotification();
+      }
       if (json.result) {
         setGeneratedScript(json.result);
       }
+      const orgMap: Record<string, string> = {};
       if (json.data?.asNames) {
-        const orgMap: Record<string, string> = {};
         for (const [asn, name] of Object.entries(json.data.asNames as Record<string, string>)) {
           orgMap[`AS${asn}`] = name;
           orgMap[asn] = name;
         }
-        if (json.data?.prefixOrgs) {
-          Object.assign(orgMap, json.data.prefixOrgs);
-        }
-        setResolvedOrgs((prev) => ({ ...prev, ...orgMap }));
       }
+      if (json.data?.prefixOrgs) {
+        Object.assign(orgMap, json.data.prefixOrgs);
+      }
+      setResolvedOrgs(orgMap);
     } catch (err: any) {
       setError(err.message || t.countryExplorer.apiError);
       setData(null);
@@ -197,6 +286,13 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
 
   const handleCountrySelect = (code: string) => {
     const normalized = code ? code.toUpperCase() : '';
+    if (normalized && normalized !== selectedCountry) {
+      const state = getCountryState(normalized);
+      const isQueueFull = (resolverStatus?.waiting?.length ?? 0) >= 3;
+      if (isQueueFull && state === 'not-resolved') {
+        showQueueFullNotification();
+      }
+    }
     setSelectedCountry(normalized);
     if (onCountryChange) {
       onCountryChange(normalized);
@@ -244,15 +340,40 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
     return () => controller.abort();
   }, [format, ipVersion, accessType, customListName]);
 
-  // Country select options
+  // Country select options reordered: completed first, then resolving, then others
   const countryOptions = useMemo(() => {
-    return ALL_COUNTRIES.map((c) => {
+    const list = [...ALL_COUNTRIES];
+
+    list.sort((a, b) => {
+      const stateA = getCountryState(a.code);
+      const stateB = getCountryState(b.code);
+
+      const rank = (s: CountryResolverState) => {
+        if (s === 'completed') return 1;
+        if (s === 'resolving') return 2;
+        return 3;
+      };
+
+      const rankA = rank(stateA);
+      const rankB = rank(stateB);
+
+      if (rankA !== rankB) {
+        return rankA - rankB;
+      }
+
+      const nameA = language === 'fa' ? a.faName : a.name;
+      const nameB = language === 'fa' ? b.faName : b.name;
+      return nameA.localeCompare(nameB, language === 'fa' ? 'fa' : 'en');
+    });
+
+    return list.map((c) => {
       const localized = language === 'fa' ? c.faName : c.name;
       return {
         value: c.code,
         label: (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
             <Space orientation="horizontal" size={8} align="center">
+              {renderStatusDot(c.code)}
               <FlagIcon code={c.code} className="w-4 h-3 rounded-[2px]" />
               <span>{localized}</span>
             </Space>
@@ -262,14 +383,29 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
         searchKey: `${c.code} ${c.name} ${c.faName} ${localized}`.toLowerCase(),
       };
     });
-  }, [language]);
+  }, [language, renderStatusDot, getCountryState]);
 
   const popularCountries = useMemo(() => {
-    return POPULAR_COUNTRIES.map((c) => ({
+    const list = POPULAR_COUNTRIES.map((c) => ({
       ...c,
       name: language === 'fa' ? c.faName : c.name,
     }));
-  }, [language]);
+
+    list.sort((a, b) => {
+      const rank = (code: string) => {
+        const s = getCountryState(code);
+        if (s === 'completed') return 1;
+        if (s === 'resolving') return 2;
+        return 3;
+      };
+      const rankA = rank(a.code);
+      const rankB = rank(b.code);
+      if (rankA !== rankB) return rankA - rankB;
+      return a.name.localeCompare(b.name, language === 'fa' ? 'fa' : 'en');
+    });
+
+    return list;
+  }, [language, getCountryState]);
 
   const currentMeta = useMemo(() => getCountryDetails(selectedCountry, language), [selectedCountry, language]);
 
@@ -309,52 +445,6 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
     const start = (page - 1) * itemsPerPage;
     return filteredList.slice(start, start + itemsPerPage);
   }, [filteredList, page, itemsPerPage]);
-
-  // Background resolution of ISP names for current table page
-  useEffect(() => {
-    if (!paginatedList.length) return;
-
-    const missingPrefixes: string[] = [];
-    const missingAsns: string[] = [];
-
-    for (const item of paginatedList) {
-      if (activeTab === 'asns') {
-        const clean = item.replace(/^AS/i, '');
-        if (!resolvedOrgs[item] && !resolvedOrgs[clean]) {
-          missingAsns.push(clean);
-        }
-      } else {
-        if (!resolvedOrgs[item]) {
-          missingPrefixes.push(item);
-        }
-      }
-    }
-
-    if (missingPrefixes.length === 0 && missingAsns.length === 0) return;
-
-    let isMounted = true;
-    setIsResolvingOrgs(true);
-
-    fetch('/api/whois/resolve-orgs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prefixes: missingPrefixes, asns: missingAsns }),
-    })
-      .then((res) => (res.ok ? res.json() : { orgs: {} }))
-      .then((resData) => {
-        if (isMounted && resData?.orgs && Object.keys(resData.orgs).length > 0) {
-          setResolvedOrgs((prev) => ({ ...prev, ...resData.orgs }));
-        }
-      })
-      .catch(() => { })
-      .finally(() => {
-        if (isMounted) setIsResolvingOrgs(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [paginatedList, activeTab]);
 
   const getOrgForItem = (item: string): string | undefined => {
     if (activeTab === 'asns') {
@@ -415,11 +505,11 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
       key: 'isp',
       render: (_: any, record: { item: string }) => {
         const org = getOrgForItem(record.item);
+        if (org === 'Unannounced') {
+          return <Tag color="default">{t.summary.unannounced || 'Unannounced'}</Tag>;
+        }
         if (org) {
           return <Text strong>{org}</Text>;
-        }
-        if (isResolvingOrgs) {
-          return <Text type="secondary" italic>{t.countryExplorer.resolving}</Text>;
         }
         return <Text type="secondary" italic>{t.countryExplorer.unknownOrg}</Text>;
       },
@@ -451,6 +541,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
+      {notificationContextHolder}
       <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         {/* Generator Form Card */}
         <Card
@@ -470,8 +561,11 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
 
               {currentMeta && (
                 <Tag color="blue" style={{ fontSize: 12, padding: '4px 8px' }}>
-                  <FlagIcon code={currentMeta.code} className="w-4 h-3 rounded-[2px]" />
-                  <span style={{ marginInlineStart: 6, fontWeight: 700 }}>{currentMeta.name}</span>
+                  <Space size={6} align="center">
+                    {renderStatusDot(currentMeta.code)}
+                    <FlagIcon code={currentMeta.code} className="w-4 h-3 rounded-[2px]" />
+                    <span style={{ fontWeight: 700 }}>{currentMeta.name}</span>
+                  </Space>
                 </Tag>
               )}
             </div>
@@ -580,9 +674,12 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
                 style={{ cursor: 'pointer', padding: '2px 8px' }}
                 onClick={() => handleCountrySelect(c.code)}
               >
-                <FlagIcon code={c.code} className="w-3.5 h-2.5 rounded-[2px]" />
-                <span style={{ marginInlineStart: 4 }}>{c.name}</span>
-                <span style={{ fontFamily: 'monospace', marginInlineStart: 4, opacity: 0.7 }}>({c.code})</span>
+                <Space size={6} align="center">
+                  {renderStatusDot(c.code)}
+                  <FlagIcon code={c.code} className="w-3.5 h-2.5 rounded-[2px]" />
+                  <span>{c.name}</span>
+                  <span style={{ fontFamily: 'monospace', opacity: 0.7 }}>({c.code})</span>
+                </Space>
               </Tag>
             ))}
           </div>

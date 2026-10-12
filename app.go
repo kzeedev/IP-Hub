@@ -107,10 +107,6 @@ func init() {
 		Max:        30,
 		Expiration: 1 * time.Minute,
 	}))
-	app.Use("/api/whois/resolve-orgs", limiter.New(limiter.Config{
-		Max:        30,
-		Expiration: 1 * time.Minute,
-	}))
 	app.Use("/api", limiter.New(limiter.Config{
 		Max:        150,
 		Expiration: 1 * time.Minute,

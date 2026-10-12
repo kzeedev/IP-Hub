@@ -129,7 +129,7 @@ IP-Hub exposes a modern OpenAPI 3.1 specification powered by [GoFiber's OpenAPI 
 | `GET` | `/api/whois/myip` | Detect client public IP and inspect WHOIS/BGP records |
 | `POST` | `/api/whois/lookup` | Unified WHOIS lookup for IP, ASN, or CIDR prefix |
 | `POST` | `/api/whois/country` | Retrieve allocated IP prefixes and ASNs for an ISO country code |
-| `POST` | `/api/whois/resolve-orgs` | Bulk resolve organization and ISP holder names |
+| `GET` | `/api/system/resolvers` | Real-time status of background country name resolving services |
 | `POST` | `/api/whois/batch` | Concurrently inspect up to 50 IP addresses |
 | `GET` | `/api/whois/subnet` | Calculate subnet breakdown, netmask, wildcard, and usable hosts |
 | `GET` | `/.well-known/api-catalog` | RFC 9727 machine-readable API discovery catalog |

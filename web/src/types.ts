@@ -188,6 +188,7 @@ export interface CountryIpResource {
   asNames?: Record<string, string>;
   prefixOrgs?: Record<string, string>;
   cached?: boolean;
+  resolverQueueFull?: boolean;
 }
 
 export interface CountryItem {
@@ -218,3 +219,33 @@ export interface SearchHistoryItem {
   countryCode?: string;
   timestamp: number;
 }
+
+export interface CategoryProgress {
+  total: number;
+  resolved: number;
+  percent: number;
+}
+
+export interface ActiveCountryJob {
+  countryCode: string;
+  countryName: string;
+  asn: CategoryProgress;
+  ipv4: CategoryProgress;
+  ipv6: CategoryProgress;
+  startedAt: string;
+}
+
+export interface QueuedCountry {
+  countryCode: string;
+  countryName: string;
+  enqueuedAt: string;
+}
+
+export type CountryResolverState = 'not-resolved' | 'resolving' | 'completed';
+
+export interface ResolverStatusResponse {
+  active: ActiveCountryJob[];
+  waiting: QueuedCountry[];
+  completed: string[];
+}
+

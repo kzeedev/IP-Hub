@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 type RipeAttribute struct {
 	Name    string `json:"name"`
 	Value   string `json:"value"`
@@ -136,6 +138,7 @@ type CountryIpResource struct {
 	AsNames                     map[string]string `json:"asNames"`
 	PrefixOrgs                  map[string]string `json:"prefixOrgs"`
 	Cached                      bool              `json:"cached"`
+	ResolverQueueFull           bool              `json:"resolverQueueFull,omitempty"`
 }
 
 type FormatResult struct {
@@ -162,3 +165,35 @@ type BatchItemResult struct {
 	AbuseEmail  string `json:"abuseEmail,omitempty"`
 	Error       string `json:"error,omitempty"`
 }
+
+// CategoryProgress tracks name resolution progress for a specific resource type.
+type CategoryProgress struct {
+	Total    int `json:"total"`
+	Resolved int `json:"resolved"`
+	Percent  int `json:"percent"`
+}
+
+// ActiveCountryJob represents a country currently undergoing background name resolution.
+type ActiveCountryJob struct {
+	CountryCode string           `json:"countryCode"`
+	CountryName string           `json:"countryName"`
+	ASN         CategoryProgress `json:"asn"`
+	IPv4        CategoryProgress `json:"ipv4"`
+	IPv6        CategoryProgress `json:"ipv6"`
+	StartedAt   time.Time        `json:"startedAt"`
+}
+
+// QueuedCountry represents a country in the queue waiting for resolution.
+type QueuedCountry struct {
+	CountryCode string    `json:"countryCode"`
+	CountryName string    `json:"countryName"`
+	EnqueuedAt  time.Time `json:"enqueuedAt"`
+}
+
+// ResolverStatusResponse represents the real-time status of the background country resolver.
+type ResolverStatusResponse struct {
+	Active    []ActiveCountryJob `json:"active"`
+	Waiting   []QueuedCountry    `json:"waiting"`
+	Completed []string           `json:"completed"`
+}
+
