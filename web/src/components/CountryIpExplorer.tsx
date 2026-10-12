@@ -41,15 +41,21 @@ import { FlagIcon } from './FlagIcon';
 const { Text, Title, Paragraph } = Typography;
 
 interface CountryIpExplorerProps {
+  countryCode?: string;
+  onCountryChange?: (code: string) => void;
   onInspectResource: (resource: string) => void;
 }
 
 type TabType = 'ipv4' | 'ipv6' | 'asns';
 
-export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({ onInspectResource }) => {
+export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
+  countryCode,
+  onCountryChange,
+  onInspectResource,
+}) => {
   const { language, t } = useLanguage();
   const { token } = theme.useToken();
-  const [selectedCountry, setSelectedCountry] = useState<string>('');
+  const [selectedCountry, setSelectedCountry] = useState<string>(countryCode ? countryCode.toUpperCase() : '');
 
   const [data, setData] = useState<CountryIpResource | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -76,6 +82,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({ onInspectR
   const [accessType, setAccessType] = useState<AccessTypeOption>('allow');
   const [customListName, setCustomListName] = useState<string>('');
   const [isConfigCopied, setIsConfigCopied] = useState<boolean>(false);
+  const [isConfigLoading, setIsConfigLoading] = useState<boolean>(false);
 
   // Fetch available plugins from backend dynamically on mount
   useEffect(() => {
@@ -175,6 +182,27 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({ onInspectR
     }
   }, [selectedCountry]);
 
+  // Sync countryCode prop changes from URL/parent
+  useEffect(() => {
+    const normalized = countryCode ? countryCode.toUpperCase() : '';
+    if (normalized !== selectedCountry) {
+      setSelectedCountry(normalized);
+      if (!normalized) {
+        setData(null);
+        setGeneratedScript({ text: '', filename: '', ruleCount: 0 });
+        setError(null);
+      }
+    }
+  }, [countryCode]);
+
+  const handleCountrySelect = (code: string) => {
+    const normalized = code ? code.toUpperCase() : '';
+    setSelectedCountry(normalized);
+    if (onCountryChange) {
+      onCountryChange(normalized);
+    }
+  };
+
   // Update server-side plugin formatted output when formatting options change
   const isInitialFormatLoad = useRef(true);
   useEffect(() => {
@@ -184,6 +212,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({ onInspectR
     }
     if (!data || !selectedCountry || !format) return;
     const controller = new AbortController();
+    setIsConfigLoading(true);
 
     fetch('/api/whois/country', {
       method: 'POST',
@@ -207,6 +236,9 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({ onInspectR
         if (err.name !== 'AbortError') {
           // ignore
         }
+      })
+      .finally(() => {
+        setIsConfigLoading(false);
       });
 
     return () => controller.abort();
@@ -459,7 +491,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({ onInspectR
                 style={{ width: '100%' }}
                 placeholder={t.countryExplorer.searchCountry}
                 value={selectedCountry || undefined}
-                onChange={setSelectedCountry}
+                onChange={handleCountrySelect}
                 options={countryOptions}
               />
             </Col>
@@ -546,7 +578,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({ onInspectR
                 key={c.code}
                 color={c.code === selectedCountry ? 'blue' : 'default'}
                 style={{ cursor: 'pointer', padding: '2px 8px' }}
-                onClick={() => setSelectedCountry(c.code)}
+                onClick={() => handleCountrySelect(c.code)}
               >
                 <FlagIcon code={c.code} className="w-3.5 h-2.5 rounded-[2px]" />
                 <span style={{ marginInlineStart: 4 }}>{c.name}</span>
@@ -556,7 +588,22 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({ onInspectR
           </div>
         </Card>
 
-        {/* Metrics Banner (Top of Configuration Result Card) */}
+        {/* Empty Selection State for /country-ips */}
+        {!selectedCountry && !isLoading && !data && (
+          <Card style={{ textAlign: 'center', padding: '36px 16px' }}>
+            <Space orientation="vertical" size="small" align="center">
+              <GlobalOutlined style={{ fontSize: 40, color: token.colorPrimary, opacity: 0.85 }} />
+              <Title level={5} style={{ margin: '8px 0 0' }}>
+                {t.countryExplorer.selectCountry}
+              </Title>
+              <Text type="secondary" style={{ maxWidth: 520, fontSize: 13 }}>
+                {t.countryExplorer.description}
+              </Text>
+            </Space>
+          </Card>
+        )}
+
+        {/* Metrics Banner */}
         {isLoading ? (
           <Row gutter={[16, 16]}>
             {[1, 2, 3, 4].map((i) => (
@@ -691,8 +738,10 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({ onInspectR
           />
         )}
 
-        {/* Configuration Result Card (Moved to another card below Metrics Banner) */}
-        {generatedScript.text && (
+        {/* Configuration Result Card */}
+        {isLoading || isConfigLoading ? (
+          <Card loading />
+        ) : generatedScript.text ? (
           <Card
             title={
               <Space orientation="horizontal" size={10} wrap>
@@ -739,10 +788,12 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({ onInspectR
               </pre>
             </div>
           </Card>
-        )}
+        ) : null}
 
         {/* Data Table Card */}
-        {data && (
+        {isLoading ? (
+          <Card loading />
+        ) : data ? (
           <Card
             title={
               <Tabs
@@ -816,7 +867,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({ onInspectR
               }}
             />
           </Card>
-        )}
+        ) : null}
       </Space>
     </div>
   );

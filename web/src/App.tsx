@@ -72,7 +72,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<ActiveView>('lookup');
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [query, setQuery] = useState<string>('');
-  const [countryExplorerCountry, setCountryExplorerCountry] = useState<string>('IR');
+  const [countryExplorerCountry, setCountryExplorerCountry] = useState<string>('');
   const [currentRecord, setCurrentRecord] = useState<WhoisRecord | null>(null);
   const [asnRecord, setAsnRecord] = useState<AsnRecord | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -222,22 +222,23 @@ export default function App() {
   // View navigation handler
   const handleNavigateView = useCallback((view: ActiveView, opts?: { query?: string; countryCode?: string }) => {
     setActiveView(view);
-    if (view === 'country-ips' && opts?.countryCode) {
-      setCountryExplorerCountry(opts.countryCode.toUpperCase());
+    const targetCountry = view === 'country-ips' ? (opts?.countryCode ? opts.countryCode.toUpperCase() : '') : '';
+    if (view === 'country-ips') {
+      setCountryExplorerCountry(targetCountry);
     }
 
     navigateRoute(view, {
       query: opts?.query || (view === 'lookup' ? query : undefined),
-      countryCode: opts?.countryCode || countryExplorerCountry,
+      countryCode: targetCountry || undefined,
       lang: language,
     });
 
     updateDocumentSeoMeta(view, language, {
       query: opts?.query || query,
-      countryCode: opts?.countryCode || countryExplorerCountry,
+      countryCode: targetCountry || undefined,
       netname: currentRecord?.netname || asnRecord?.holder,
     });
-  }, [language, query, countryExplorerCountry, currentRecord, asnRecord]);
+  }, [language, query, currentRecord, asnRecord]);
 
   // Initial Route Resolution on Mount
   useEffect(() => {
@@ -249,10 +250,10 @@ export default function App() {
     }
 
     if (route.view === 'country-ips') {
-      const cCode = route.countryCode || 'IR';
+      const cCode = route.countryCode ? route.countryCode.toUpperCase() : '';
       setCountryExplorerCountry(cCode);
       setIsLoading(false);
-      updateDocumentSeoMeta('country-ips', route.lang, { countryCode: cCode });
+      updateDocumentSeoMeta('country-ips', route.lang, { countryCode: cCode || undefined });
     } else if (route.view === 'lookup') {
       if (route.query) {
         setQuery(route.query);
@@ -273,9 +274,9 @@ export default function App() {
       setActiveView(route.view);
 
       if (route.view === 'country-ips') {
-        const cCode = route.countryCode || 'IR';
+        const cCode = route.countryCode ? route.countryCode.toUpperCase() : '';
         setCountryExplorerCountry(cCode);
-        updateDocumentSeoMeta('country-ips', route.lang, { countryCode: cCode });
+        updateDocumentSeoMeta('country-ips', route.lang, { countryCode: cCode || undefined });
       } else if (route.view === 'lookup') {
         if (route.query && route.query !== query) {
           setQuery(route.query);
@@ -456,6 +457,10 @@ export default function App() {
             <Suspense fallback={<ViewFallback />}>
               {activeView === 'country-ips' && (
                 <CountryIpExplorer
+                  countryCode={countryExplorerCountry}
+                  onCountryChange={(code) => {
+                    handleNavigateView('country-ips', { countryCode: code });
+                  }}
                   onInspectResource={(resource) => {
                     setQuery(resource);
                     handleNavigateView('lookup', { query: resource });
@@ -572,7 +577,7 @@ export default function App() {
 
           {/* Rich SEO Content Section */}
           <Suspense fallback={null}>
-            <SeoSection />
+            <SeoSection onExploreCountry={(cCode) => handleNavigateView('country-ips', { countryCode: cCode })} />
           </Suspense>
 
           {/* Footer */}

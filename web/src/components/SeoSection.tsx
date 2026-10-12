@@ -16,7 +16,11 @@ import { FlagIcon } from './FlagIcon';
 
 const { Title, Paragraph, Text } = Typography;
 
-export const SeoSection: React.FC = () => {
+interface SeoSectionProps {
+  onExploreCountry?: (countryCode: string) => void;
+}
+
+export const SeoSection: React.FC<SeoSectionProps> = ({ onExploreCountry }) => {
   const { language, t, isRtl } = useLanguage();
   const { token } = theme.useToken();
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
@@ -148,6 +152,12 @@ export const SeoSection: React.FC = () => {
                   <a
                     href={getRouteUrl('country-ips', { countryCode: c.code, lang: language })}
                     hrefLang={language}
+                    onClick={(e) => {
+                      if (onExploreCountry && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                        e.preventDefault();
+                        onExploreCountry(c.code);
+                      }
+                    }}
                     style={{ color: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                   >
                     <FlagIcon code={c.code} className="w-3.5 h-2.5 rounded-[2px]" />

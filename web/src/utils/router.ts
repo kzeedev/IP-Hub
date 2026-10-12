@@ -53,7 +53,7 @@ export function parseRoute(
   const rest = segments.slice(1).join('/');
 
   if (first === 'country' || first === 'countries' || first === 'country-ips') {
-    const countryCode = rest ? rest.toUpperCase() : 'IR';
+    const countryCode = rest ? rest.toUpperCase() : undefined;
     return { view: 'country-ips', countryCode, lang };
   }
 
