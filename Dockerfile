@@ -1,3 +1,5 @@
+ARG VERSION=dev
+
 # ==========================================
 # Stage 1: Build Modern React Frontend
 # ==========================================
@@ -19,7 +21,7 @@ FROM golang:alpine AS backend-builder
 
 RUN apk add --no-cache build-base ca-certificates
 
-ARG Version
+ARG VERSION
 ENV GOCACHE=/root/.cache/go-build
 ENV GOTOOLCHAIN=auto
 
@@ -31,7 +33,7 @@ RUN go mod download
 COPY . .
 
 # Build main Go application binary
-RUN go build -ldflags="-X 'github.com/kzeedev/IP-Hub/config.Version=${Version}' -s -w" -trimpath -o /dist/app
+RUN go build -ldflags="-s -w -X github.com/kzeedev/IP-Hub/config.Version=${VERSION}" -trimpath -o /dist/app
 
 # Build dynamic Go plugins
 RUN for f in plugins/*/*.go; do \

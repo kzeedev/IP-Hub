@@ -38,10 +38,11 @@ jobs:
         id: define-version
         run: |
           if [ "${{ github.event_name }}" = "push" ]; then
-            echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+            VERSION="${{ github.ref_name }}"
           else
-            echo "VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+            VERSION="${{ inputs.tag || github.event.inputs.tag }}"
           fi
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
       - name: Define Tags
         id: define-tags
@@ -49,7 +50,7 @@ jobs:
           if [ "${{ github.event_name }}" == "push" ]; then
             echo "tags=ghcr.io/${{ github.repository_owner }}/ip-hub:${{ github.ref_name }},ghcr.io/${{ github.repository_owner }}/ip-hub:latest" >> $GITHUB_ENV
           else
-            echo "tags=ghcr.io/${{ github.repository_owner }}/ip-hub:${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+            echo "tags=ghcr.io/${{ github.repository_owner }}/ip-hub:${{ inputs.tag || github.event.inputs.tag }}" >> $GITHUB_ENV
           fi
 
       - name: Build and push Docker images
@@ -62,5 +63,5 @@ jobs:
           file: ./Dockerfile
           push: true
           build-args: |
-            Version=${{ env.VERSION }}
+            VERSION=${{ env.VERSION }}
           tags: ${{ env.tags }}
