@@ -8,7 +8,7 @@ function flagIconsPlugin(): Plugin {
   return {
     name: 'vite-plugin-flag-icons',
     buildStart() {
-      const srcDir = path.resolve(__dirname, 'node_modules/flag-icons/flags/4x3');
+      const srcDir = path.resolve(import.meta.dirname, 'node_modules/flag-icons/flags/4x3');
       if (!fs.existsSync(srcDir)) return;
 
       const files = fs.readdirSync(srcDir);
@@ -29,7 +29,7 @@ function flagIconsPlugin(): Plugin {
         if (!req.url) return next();
         if (req.url.startsWith('/assets/img/flags/4x3/')) {
           const flagFile = req.url.replace(/^.*\/4x3\//, '').split('?')[0];
-          const flagPath = path.resolve(__dirname, 'node_modules/flag-icons/flags/4x3', flagFile);
+          const flagPath = path.resolve(import.meta.dirname, 'node_modules/flag-icons/flags/4x3', flagFile);
           if (fs.existsSync(flagPath) && fs.statSync(flagPath).isFile()) {
             res.setHeader('Content-Type', 'image/svg+xml');
             res.setHeader('Cache-Control', 'public, max-age=604800');
@@ -49,7 +49,7 @@ function htmlVersionPlugin(): Plugin {
       let version = process.env.VITE_APP_VERSION || process.env.VERSION;
       if (!version) {
         try {
-          const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
+          const pkg = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, 'package.json'), 'utf-8'));
           version = pkg.version;
         } catch {
           version = '2.2.0';
@@ -68,7 +68,7 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss(), flagIconsPlugin(), htmlVersionPlugin()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, './src'),
+        '@': path.resolve(import.meta.dirname, './src'),
       },
     },
     server: {
@@ -92,9 +92,6 @@ export default defineConfig(() => {
           manualChunks(id) {
             if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/scheduler')) {
               return 'vendor-react';
-            }
-            if (id.includes('node_modules/lucide-react')) {
-              return 'vendor-icons';
             }
           },
         },

@@ -828,7 +828,7 @@ IP-Hub is built with performance and security at its core.
 
 - **Backend Framework**: Go (%s) with Fiber v3 (`+"`github.com/gofiber/fiber/v3`"+`).
 - **Caching Layer**: Redis with daily end-of-day TTL and atomic key management.
-- **Frontend**: React 19 SPA with Vite, Tailwind CSS, and Lucide icons.
+- **Frontend**: React 19 SPA with Vite, Tailwind CSS, and Ant Design.
 - **Data Upstreams**: RIPE NCC REST API, RIPE Stat RIS peer routing analytics, and RDAP endpoints.
 - **Content Negotiation**: Cloudflare **Markdown for Agents** compliance (`+"`Accept: text/markdown`"+`).
 
@@ -884,4 +884,3 @@ description: Display language, theme preferences, and service status.
 - **Supported Languages**: English (en) and Persian (fa)
 `, config.Version)
 }
-
