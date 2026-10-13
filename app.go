@@ -135,7 +135,7 @@ func init() {
 
 	// Route non-API GET requests to SPA index.html
 	app.Get("*", func(c fiber.Ctx) error {
-		if strings.HasPrefix(c.Path(), "/api") || strings.HasPrefix(c.Path(), "/openapi") || strings.HasPrefix(c.Path(), "/docs") || strings.HasPrefix(c.Path(), "/schemas") || strings.HasPrefix(c.Path(), "/.well-known") {
+		if strings.HasPrefix(c.Path(), "/api") || strings.HasPrefix(c.Path(), "/openapi") || strings.HasPrefix(c.Path(), "/docs") || strings.HasPrefix(c.Path(), "/schemas") || strings.HasPrefix(c.Path(), "/.well-known") || c.Path() == "/dl" {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Endpoint not found"})
 		}
 		c.Set("Vary", "Accept")

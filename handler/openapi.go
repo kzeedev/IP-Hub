@@ -136,6 +136,22 @@ type WhoisSubnetOutput struct {
 	}
 }
 
+// DirectDownloadInput represents query parameters for direct download of country IP rules
+type DirectDownloadInput struct {
+	Country  string `query:"country" doc:"Two-letter ISO 3166-1 alpha-2 country code (e.g. US, DE, IR)" example:"IR"`
+	Format   string `query:"format" doc:"Firewall/Export format (mikrotik, cisco, pf, freebsd-pf, ipset, htaccess, json)" example:"mikrotik"`
+	Version  string `query:"version" default:"any" doc:"IP version filter (any, ipv4, ipv6)" example:"any"`
+	Access   string `query:"access" default:"allow" doc:"Access policy (allow, deny)" example:"allow"`
+	ListName string `query:"listName" doc:"Optional custom address list or ACL name" example:"IR"`
+}
+
+// DirectDownloadOutput represents raw file download response with content disposition header
+type DirectDownloadOutput struct {
+	ContentType        string `header:"Content-Type"`
+	ContentDisposition string `header:"Content-Disposition"`
+	Body               []byte
+}
+
 // SetupOpenAPI registers OpenAPI 3.1 endpoints and documentation routes.
 func (h *Handler) SetupOpenAPI(app *fiber.App) huma.API {
 	version := config.GetVersion()
@@ -294,6 +310,68 @@ func (h *Handler) SetupOpenAPI(app *fiber.App) huma.API {
 		resp.Body.Data = res
 		resp.Body.Result = result
 		return resp, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "direct-download",
+		Method:      http.MethodGet,
+		Path:        "/dl",
+		Summary:     "Direct Download Formatted Country IP Rules",
+		Description: "Downloads firewall rules or network configuration scripts directly for a country code (e.g. MikroTik, Cisco, PF, ipset).",
+		Tags:        []string{"Country Resources"},
+	}, func(ctx context.Context, input *DirectDownloadInput) (*DirectDownloadOutput, error) {
+		country := strings.ToUpper(strings.TrimSpace(input.Country))
+		if len(country) != 2 || country[0] < 'A' || country[0] > 'Z' || country[1] < 'A' || country[1] > 'Z' {
+			return nil, huma.Error400BadRequest("Country code must be a 2-letter ISO 3166-1 alpha-2 code (e.g. US, DE, IR)")
+		}
+
+		format := strings.ToLower(strings.TrimSpace(input.Format))
+		if format == "" {
+			return nil, huma.Error400BadRequest("Format parameter is required and cannot be empty (e.g. mikrotik, cisco, pf, ipset, json, htaccess)")
+		}
+
+		// version parameter is defaulted to any and can be not set
+		version := strings.ToLower(strings.TrimSpace(input.Version))
+		if version == "" {
+			version = "any"
+		}
+
+		// access parameter is access policy (allow/deny) and can be empty defaulted to allow
+		access := strings.ToLower(strings.TrimSpace(input.Access))
+		if access != "deny" {
+			access = "allow"
+		}
+
+		listName := strings.TrimSpace(input.ListName)
+		if listName == "" {
+			listName = country
+		}
+
+		res, err := h.svc.LookupCountry(country)
+		if err != nil {
+			return nil, huma.Error500InternalServerError(err.Error())
+		}
+
+		result := h.svc.FormatCountry(res, format, version, access, listName)
+		if result == nil {
+			return nil, huma.Error500InternalServerError("Failed to format country resources")
+		}
+
+		filename := result.Filename
+		if filename == "" {
+			filename = fmt.Sprintf("%s_%s.txt", strings.ToLower(country), format)
+		}
+
+		contentType := "text/plain; charset=utf-8"
+		if strings.HasSuffix(strings.ToLower(filename), ".json") {
+			contentType = "application/json; charset=utf-8"
+		}
+
+		return &DirectDownloadOutput{
+			ContentType:        contentType,
+			ContentDisposition: fmt.Sprintf("attachment; filename=%q", filename),
+			Body:               []byte(result.Text),
+		}, nil
 	})
 
 	huma.Register(api, huma.Operation{

@@ -695,3 +695,90 @@ func TestCountryNameResolverQueueAndConcurrency(t *testing.T) {
 		t.Errorf("Expected 3 waiting countries (queue limit), got %d", len(status.Waiting))
 	}
 }
+
+func TestDirectDownloadEndpoint(t *testing.T) {
+	app := fiber.New()
+	mockSvc := &MockWhoisService{}
+	h := handler.New(mockSvc)
+	h.SetupOpenAPI(app)
+
+	var capturedFormat, capturedVersion, capturedAccess, capturedList string
+	mockSvc.FormatCountryFunc = func(res *models.CountryIpResource, fmtStr, ver, acc, list string) *models.FormatResult {
+		capturedFormat = fmtStr
+		capturedVersion = ver
+		capturedAccess = acc
+		capturedList = list
+		return &models.FormatResult{
+			Text:      fmt.Sprintf("# %s config for %s", fmtStr, res.CountryCode),
+			Filename:  fmt.Sprintf("%s_%s.txt", strings.ToLower(res.CountryCode), fmtStr),
+			RuleCount: 5,
+		}
+	}
+
+	// 1. Direct download with all parameters: /dl?country=IR&format=mikrotik&version=ipv4&access=allow
+	req1 := httptest.NewRequest(http.MethodGet, "/dl?country=IR&format=mikrotik&version=ipv4&access=allow", nil)
+	resp1, err := app.Test(req1)
+	if err != nil {
+		t.Fatalf("Download request 1 failed: %v", err)
+	}
+	if resp1.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", resp1.StatusCode)
+	}
+	disp1 := resp1.Header.Get("Content-Disposition")
+	if !strings.Contains(disp1, "attachment") || !strings.Contains(disp1, "ir_mikrotik.txt") {
+		t.Errorf("Expected attachment Content-Disposition header with filename, got %s", disp1)
+	}
+	if capturedFormat != "mikrotik" || capturedVersion != "ipv4" || capturedAccess != "allow" || capturedList != "IR" {
+		t.Errorf("Expected mikrotik/ipv4/allow/IR, got %s/%s/%s/%s", capturedFormat, capturedVersion, capturedAccess, capturedList)
+	}
+	body1, _ := io.ReadAll(resp1.Body)
+	if len(body1) == 0 {
+		t.Errorf("Expected non-empty body for download")
+	}
+
+	// 2. Direct download with defaults (version omitted -> any, access omitted -> allow)
+	req2 := httptest.NewRequest(http.MethodGet, "/dl?country=ir&format=mikrotik", nil)
+	resp2, err := app.Test(req2)
+	if err != nil {
+		t.Fatalf("Download request 2 failed: %v", err)
+	}
+	if resp2.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", resp2.StatusCode)
+	}
+	if capturedVersion != "any" || capturedAccess != "allow" {
+		t.Errorf("Expected defaults any/allow, got %s/%s", capturedVersion, capturedAccess)
+	}
+
+	// 3. Direct download with version=any and access=deny
+	req3 := httptest.NewRequest(http.MethodGet, "/dl?country=IR&format=cisco&version=any&access=deny", nil)
+	resp3, err := app.Test(req3)
+	if err != nil {
+		t.Fatalf("Download request 3 failed: %v", err)
+	}
+	if resp3.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", resp3.StatusCode)
+	}
+	if capturedVersion != "any" || capturedAccess != "deny" {
+		t.Errorf("Expected any/deny, got %s/%s", capturedVersion, capturedAccess)
+	}
+
+	// 4. Invalid country code -> 400
+	req4 := httptest.NewRequest(http.MethodGet, "/dl?country=INVALID&format=mikrotik", nil)
+	resp4, err := app.Test(req4)
+	if err != nil {
+		t.Fatalf("Download request 4 failed: %v", err)
+	}
+	if resp4.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for invalid country, got %d", resp4.StatusCode)
+	}
+
+	// 5. Missing format -> 400
+	req5 := httptest.NewRequest(http.MethodGet, "/dl?country=IR", nil)
+	resp5, err := app.Test(req5)
+	if err != nil {
+		t.Fatalf("Download request 5 failed: %v", err)
+	}
+	if resp5.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for missing format, got %d", resp5.StatusCode)
+	}
+}

@@ -18,6 +18,7 @@ import {
   BorderBeam,
   Badge,
   notification,
+  Tooltip,
 } from 'antd';
 import {
   GlobalOutlined,
@@ -481,6 +482,32 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
     downloadText(generatedScript.filename, generatedScript.text);
   };
 
+  // Construct direct download link: /dl?country=IR&format=mikrotik&version=ipv4&access=allow
+  const downloadUrl = useMemo(() => {
+    if (!selectedCountry || !format) return '';
+    const params = new URLSearchParams();
+    params.set('country', selectedCountry);
+    params.set('format', format);
+    if (ipVersion && ipVersion !== 'any') {
+      params.set('version', ipVersion);
+    }
+    params.set('access', accessType);
+    if (customListName && customListName !== selectedCountry) {
+      params.set('listName', customListName);
+    }
+    return `/dl?${params.toString()}`;
+  }, [selectedCountry, format, ipVersion, accessType, customListName]);
+
+  const [isLinkCopied, setIsLinkCopied] = useState<boolean>(false);
+
+  const handleCopyDownloadLink = () => {
+    if (!downloadUrl) return;
+    const fullUrl = `${window.location.origin}${downloadUrl}`;
+    copyToClipboard(fullUrl);
+    setIsLinkCopied(true);
+    setTimeout(() => setIsLinkCopied(false), 2000);
+  };
+
   const handleCopySingle = (val: string) => {
     copyToClipboard(val);
     setCopiedItem(val);
@@ -861,9 +888,27 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
                 >
                   {isConfigCopied ? t.countryExplorer.copied : t.countryExplorer.copyScript}
                 </Button>
-                <Button icon={<DownloadOutlined />} onClick={handleDownloadGenerated}>
+                <Button
+                  icon={<DownloadOutlined />}
+                  href={downloadUrl || undefined}
+                  download={generatedScript.filename || undefined}
+                  onClick={(e) => {
+                    if (!downloadUrl && generatedScript.text) {
+                      e.preventDefault();
+                      handleDownloadGenerated();
+                    }
+                  }}
+                >
                   {t.countryExplorer.downloadScript}
                 </Button>
+                <Tooltip title={isLinkCopied ? t.countryExplorer.copied : (t.countryExplorer.copyDownloadLink || 'Copy download link')}>
+                  <Button
+                    icon={isLinkCopied ? <CheckOutlined style={{ color: '#52c41a' }} /> : <LinkOutlined />}
+                    onClick={handleCopyDownloadLink}
+                    disabled={!downloadUrl}
+                    title={t.countryExplorer.copyDownloadLink || 'Copy download link'}
+                  />
+                </Tooltip>
               </Space>
             }
           >
