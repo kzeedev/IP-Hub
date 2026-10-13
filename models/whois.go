@@ -148,8 +148,9 @@ type FormatResult struct {
 }
 
 type PluginInfo struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Extension string `json:"extension,omitempty"`
 }
 
 type BatchItemResult struct {

@@ -24,6 +24,7 @@ export type ExportFormat = string;
 export interface PluginFormat {
   id: string;
   name: string;
+  extension?: string;
 }
 
 export interface SystemPluginsResponse {

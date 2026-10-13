@@ -9,6 +9,7 @@ import (
 
 const id string = "ipset"
 const name string = "Linux ipset"
+const extension string = "sh"
 
 // IPSetPlugin implements the Plugin interface
 type IPSetPlugin struct {
@@ -18,7 +19,7 @@ type IPSetPlugin struct {
 // NewIPSetPlugin creates a new instance of IPSetPlugin
 func NewIPSetPlugin() *IPSetPlugin {
 	return &IPSetPlugin{
-		BasePlugin: pluginBase.NewBasePlugin(id, name),
+		BasePlugin: pluginBase.NewBasePlugin(id, name, extension),
 	}
 }
 
@@ -30,6 +31,9 @@ func (p *IPSetPlugin) Format(data pluginBase.Lookup, ipVersion pluginBase.IPVers
 	}
 
 	setName := fmt.Sprintf("country_%s", strings.ToLower(data.CountryCode))
+	if data.ListName != "" {
+		setName = data.ListName
+	}
 
 	v4Rules := ""
 	v6Rules := ""

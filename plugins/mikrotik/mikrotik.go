@@ -8,6 +8,7 @@ import (
 
 const id string = "mikrotik"
 const name string = "Mikrotik address-list"
+const extension string = "rsc"
 
 // MikrotikPlugin implements the Plugin interface
 type MikrotikPlugin struct {
@@ -17,7 +18,7 @@ type MikrotikPlugin struct {
 // NewMikrotikPlugin creates a new instance of MikrotikPlugin
 func NewMikrotikPlugin() *MikrotikPlugin {
 	return &MikrotikPlugin{
-		BasePlugin: pluginBase.NewBasePlugin(id, name),
+		BasePlugin: pluginBase.NewBasePlugin(id, name, extension),
 	}
 }
 
@@ -25,15 +26,16 @@ func NewMikrotikPlugin() *MikrotikPlugin {
 func (p *MikrotikPlugin) Format(data pluginBase.Lookup, ipVersion pluginBase.IPVersion, _ bool) string {
 	IPv4 := ""
 	IPv6 := ""
+	listName := data.GetListName()
 
 	if ipVersion == pluginBase.IPv4 || ipVersion == pluginBase.Any {
 		for _, ip := range data.IPv4 {
-			IPv4 += fmt.Sprintf("add list=%v address=%v\n", data.CountryCode, ip)
+			IPv4 += fmt.Sprintf("add list=%v address=%v\n", listName, ip)
 		}
 	}
 	if ipVersion == pluginBase.IPv6 || ipVersion == pluginBase.Any {
 		for _, ip := range data.IPv6 {
-			IPv6 += fmt.Sprintf("add list=%v address=%v\n", data.CountryCode, ip)
+			IPv6 += fmt.Sprintf("add list=%v address=%v\n", listName, ip)
 		}
 	}
 

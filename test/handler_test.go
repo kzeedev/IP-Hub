@@ -111,9 +111,9 @@ func (m *MockWhoisService) GetAvailablePlugins() []models.PluginInfo {
 		return m.GetAvailablePluginsFunc()
 	}
 	return []models.PluginInfo{
-		{ID: "mikrotik", Name: "Mikrotik address-list"},
-		{ID: "json", Name: "JSON Data"},
-		{ID: "htaccess", Name: "Apache .htaccess"},
+		{ID: "mikrotik", Name: "Mikrotik address-list", Extension: "rsc"},
+		{ID: "json", Name: "JSON Data", Extension: "json"},
+		{ID: "htaccess", Name: "Apache .htaccess", Extension: "htaccess"},
 	}
 }
 
@@ -367,22 +367,22 @@ type mockPlugin struct {
 	*pluginBase.BasePlugin
 }
 
-func newMockPlugin(id, name string) *mockPlugin {
+func newMockPlugin(id, name string, extension ...string) *mockPlugin {
 	return &mockPlugin{
-		BasePlugin: pluginBase.NewBasePlugin(id, name),
+		BasePlugin: pluginBase.NewBasePlugin(id, name, extension...),
 	}
 }
 
 func (m *mockPlugin) Format(data pluginBase.Lookup, ipVersion pluginBase.IPVersion, access bool) string {
-	return fmt.Sprintf("rules for %s format=%s version=%s access=%v", data.CountryCode, m.GetID(), ipVersion, access)
+	return fmt.Sprintf("rules for %s (list=%s) format=%s version=%s access=%v", data.CountryCode, data.GetListName(), m.GetID(), ipVersion, access)
 }
 
 func TestBuiltinPluginFormatting(t *testing.T) {
 	handler.SetPlugins([]pluginBase.Plugin{
-		newMockPlugin("mikrotik", "Mikrotik"),
-		newMockPlugin("cisco", "Cisco"),
-		newMockPlugin("freebsd-pf", "FreeBSD PF"),
-		newMockPlugin("ipset", "Linux IPSet"),
+		newMockPlugin("mikrotik", "Mikrotik", "rsc"),
+		newMockPlugin("cisco", "Cisco", "txt"),
+		newMockPlugin("freebsd-pf", "FreeBSD PF", "conf"),
+		newMockPlugin("ipset", "Linux IPSet", "sh"),
 	})
 
 	svc := handler.NewWhoisService()
@@ -395,16 +395,17 @@ func TestBuiltinPluginFormatting(t *testing.T) {
 	}
 
 	formats := []struct {
-		format      string
-		expectedSub string
+		format       string
+		expectedSub  string
+		expectedFile string
 	}{
-		{"mikrotik", "rules for IR format=mikrotik"},
-		{"cisco", "rules for IR format=cisco"},
-		{"pf", "rules for IR format=freebsd-pf"},
-		{"freebsd-pf", "rules for IR format=freebsd-pf"},
-		{"ipset", "rules for IR format=ipset"},
-		{"htaccess", "Allow from 5.10.128.0/17"},
-		{"json", `"CountryCode": "IR"`},
+		{"mikrotik", "rules for IR (list=IR) format=mikrotik", "ir_mikrotik.rsc"},
+		{"cisco", "rules for IR (list=IR) format=cisco", "ir_cisco.txt"},
+		{"pf", "rules for IR (list=IR) format=freebsd-pf", "ir_pf.conf"},
+		{"freebsd-pf", "rules for IR (list=IR) format=freebsd-pf", "ir_freebsd-pf.conf"},
+		{"ipset", "rules for IR (list=IR) format=ipset", "ir_ipset.sh"},
+		{"htaccess", "Allow from 5.10.128.0/17", ".htaccess_ir"},
+		{"json", `"CountryCode": "IR"`, "ir.json"},
 	}
 
 	for _, tc := range formats {
@@ -418,6 +419,15 @@ func TestBuiltinPluginFormatting(t *testing.T) {
 		if !strings.Contains(out.Text, tc.expectedSub) {
 			t.Errorf("Format %s: expected output containing %q, got: %s", tc.format, tc.expectedSub, out.Text)
 		}
+		if out.Filename != tc.expectedFile {
+			t.Errorf("Format %s: expected filename %q, got %q", tc.format, tc.expectedFile, out.Filename)
+		}
+	}
+
+	// Test custom ListName handling
+	customOut := svc.FormatCountry(res, "mikrotik", "any", "allow", "CUSTOM_IR")
+	if !strings.Contains(customOut.Text, "(list=CUSTOM_IR)") {
+		t.Errorf("Expected custom list name in output, got: %s", customOut.Text)
 	}
 }
 
@@ -446,8 +456,8 @@ func TestPluginsEndpoint(t *testing.T) {
 	if len(res.Plugins) != 3 {
 		t.Errorf("Expected 3 plugins, got %d", len(res.Plugins))
 	}
-	if res.Plugins[0].ID != "mikrotik" {
-		t.Errorf("Expected first plugin ID mikrotik, got %s", res.Plugins[0].ID)
+	if res.Plugins[0].ID != "mikrotik" || res.Plugins[0].Extension != "rsc" {
+		t.Errorf("Expected first plugin ID mikrotik with ext rsc, got %+v", res.Plugins[0])
 	}
 }
 
@@ -510,8 +520,8 @@ func TestStatusEndpoint(t *testing.T) {
 
 func TestGetAvailablePluginsRealService(t *testing.T) {
 	handler.SetPlugins([]pluginBase.Plugin{
-		newMockPlugin("mikrotik", "Mikrotik address-list"),
-		newMockPlugin("cisco", "Cisco access-list"),
+		newMockPlugin("mikrotik", "Mikrotik address-list", "rsc"),
+		newMockPlugin("cisco", "Cisco access-list", "txt"),
 	})
 
 	svc := handler.NewWhoisService()
@@ -525,11 +535,25 @@ func TestGetAvailablePluginsRealService(t *testing.T) {
 	hasJSON := false
 	hasHtaccess := false
 	for _, p := range pluginsList {
-		if p.ID == "json" {
+		switch p.ID {
+		case "mikrotik":
+			if p.Extension != "rsc" {
+				t.Errorf("Expected mikrotik extension 'rsc', got '%s'", p.Extension)
+			}
+		case "cisco":
+			if p.Extension != "txt" {
+				t.Errorf("Expected cisco extension 'txt', got '%s'", p.Extension)
+			}
+		case "json":
 			hasJSON = true
-		}
-		if p.ID == "htaccess" {
+			if p.Extension != "json" {
+				t.Errorf("Expected json extension 'json', got '%s'", p.Extension)
+			}
+		case "htaccess":
 			hasHtaccess = true
+			if p.Extension != "htaccess" {
+				t.Errorf("Expected htaccess extension 'htaccess', got '%s'", p.Extension)
+			}
 		}
 	}
 	if !hasJSON || !hasHtaccess {

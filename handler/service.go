@@ -1121,14 +1121,15 @@ func (s *whoisService) GetAvailablePlugins() []models.PluginInfo {
 	result := make([]models.PluginInfo, 0, len(plugins)+2)
 	for _, p := range plugins {
 		result = append(result, models.PluginInfo{
-			ID:   p.GetID(),
-			Name: p.GetName(),
+			ID:        p.GetID(),
+			Name:      p.GetName(),
+			Extension: p.GetExtension(),
 		})
 	}
 
 	result = append(result,
-		models.PluginInfo{ID: "json", Name: "JSON Data"},
-		models.PluginInfo{ID: "htaccess", Name: "Apache .htaccess"},
+		models.PluginInfo{ID: "json", Name: "JSON Data", Extension: "json"},
+		models.PluginInfo{ID: "htaccess", Name: "Apache .htaccess", Extension: "htaccess"},
 	)
 
 	return result
@@ -1159,6 +1160,7 @@ func (s *whoisService) FormatCountry(resource *models.CountryIpResource, format,
 	lookup := pluginBase.Lookup{
 		CountryCode: resource.CountryCode,
 		CountryName: resource.CountryName,
+		ListName:    listName,
 		ASN:         asnStrs,
 		IPv4:        resource.IPv4,
 		IPv6:        resource.IPv6,
@@ -1199,9 +1201,13 @@ func (s *whoisService) FormatCountry(resource *models.CountryIpResource, format,
 			pID := strings.ToLower(p.GetID())
 			if pID == cleanFormat || (cleanFormat == "pf" && pID == "freebsd-pf") {
 				text := p.Format(lookup, ipVer, isAllow)
+				ext := p.GetExtension()
+				if ext == "" {
+					ext = "txt"
+				}
 				return &models.FormatResult{
 					Text:      text,
-					Filename:  fmt.Sprintf("%s_%s.txt", strings.ToLower(resource.CountryCode), cleanFormat),
+					Filename:  fmt.Sprintf("%s_%s.%s", strings.ToLower(resource.CountryCode), cleanFormat, ext),
 					RuleCount: len(resource.IPv4) + len(resource.IPv6),
 				}
 			}

@@ -9,6 +9,7 @@ import (
 
 const id string = "freebsd-pf"
 const name string = "FreeBSD packet filter"
+const extension string = "conf"
 
 // FreeBSDPFPlugin implements the Plugin interface
 type FreeBSDPFPlugin struct {
@@ -18,7 +19,7 @@ type FreeBSDPFPlugin struct {
 // NewFreeBSDPFPlugin creates a new instance of FreeBSDPFPlugin
 func NewFreeBSDPFPlugin() *FreeBSDPFPlugin {
 	return &FreeBSDPFPlugin{
-		BasePlugin: pluginBase.NewBasePlugin(id, name),
+		BasePlugin: pluginBase.NewBasePlugin(id, name, extension),
 	}
 }
 
@@ -44,6 +45,9 @@ func (p *FreeBSDPFPlugin) Format(data pluginBase.Lookup, ipVersion pluginBase.IP
 	}
 
 	tableName := fmt.Sprintf("ips_%v", strings.ToLower(data.CountryCode))
+	if data.ListName != "" {
+		tableName = data.ListName
+	}
 
 	switch ipVersion {
 	case pluginBase.IPv4:

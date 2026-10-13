@@ -9,6 +9,7 @@ import (
 
 const id string = "fortigate"
 const name string = "Fortigate Address List"
+const extension string = "txt"
 
 // FortigatePlugin implements the Plugin interface
 type FortigatePlugin struct {
@@ -18,7 +19,7 @@ type FortigatePlugin struct {
 // NewFortigatePlugin creates a new instance of FortigatePlugin
 func NewFortigatePlugin() *FortigatePlugin {
 	return &FortigatePlugin{
-		BasePlugin: pluginBase.NewBasePlugin(id, name),
+		BasePlugin: pluginBase.NewBasePlugin(id, name, extension),
 	}
 }
 

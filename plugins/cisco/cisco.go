@@ -8,6 +8,7 @@ import (
 
 const id string = "cisco"
 const name string = "Cisco access-list"
+const extension string = "txt"
 
 // CiscoPlugin implements the Plugin interface
 type CiscoPlugin struct {
@@ -17,7 +18,7 @@ type CiscoPlugin struct {
 // NewCiscoPlugin creates a new instance of CiscoPlugin
 func NewCiscoPlugin() *CiscoPlugin {
 	return &CiscoPlugin{
-		BasePlugin: pluginBase.NewBasePlugin(id, name),
+		BasePlugin: pluginBase.NewBasePlugin(id, name, extension),
 	}
 }
 
@@ -29,15 +30,16 @@ func (p *CiscoPlugin) Format(data pluginBase.Lookup, ipVersion pluginBase.IPVers
 	if !access {
 		_access = "deny"
 	}
+	listName := data.GetListName()
 
 	if ipVersion == pluginBase.IPv4 || ipVersion == pluginBase.Any {
 		for _, ip := range data.IPv4 {
-			IPv4 += fmt.Sprintf("ip access-list %v %s %v\n", data.CountryCode, _access, ip)
+			IPv4 += fmt.Sprintf("ip access-list %v %s %v\n", listName, _access, ip)
 		}
 	}
 	if ipVersion == pluginBase.IPv6 || ipVersion == pluginBase.Any {
 		for _, ip := range data.IPv6 {
-			IPv6 += fmt.Sprintf("ipv6 access-list %v %s any %v any any\n", data.CountryCode, _access, ip)
+			IPv6 += fmt.Sprintf("ipv6 access-list %v %s any %v any any\n", listName, _access, ip)
 		}
 	}
 
