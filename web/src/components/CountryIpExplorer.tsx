@@ -33,6 +33,8 @@ import {
   CodeOutlined,
   SearchOutlined,
   FilterOutlined,
+  RobotOutlined,
+  QuestionCircleOutlined,
 } from '@ant-design/icons';
 import {
   CountryIpResource,
@@ -95,6 +97,23 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
   const [customListName, setCustomListName] = useState<string>('');
   const [isConfigCopied, setIsConfigCopied] = useState<boolean>(false);
   const [isConfigLoading, setIsConfigLoading] = useState<boolean>(false);
+  const [isLinkCopied, setIsLinkCopied] = useState<boolean>(false);
+
+  // Construct direct download link
+  const downloadUrl = useMemo(() => {
+    if (!selectedCountry || !format) return '';
+    const params = new URLSearchParams();
+    params.set('country', selectedCountry);
+    params.set('format', format);
+    if (ipVersion && ipVersion !== 'any') {
+      params.set('version', ipVersion);
+    }
+    params.set('access', accessType);
+    if (customListName && customListName !== selectedCountry) {
+      params.set('listName', customListName);
+    }
+    return `/dl?${params.toString()}`;
+  }, [selectedCountry, format, ipVersion, accessType, customListName]);
 
   // Background resolver state polling
   const [resolverStatus, setResolverStatus] = useState<ResolverStatusResponse | null>(null);
@@ -109,7 +128,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
             setResolverStatus(data);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     };
 
     fetchStatus();
@@ -164,8 +183,8 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
         state === 'resolving'
           ? t.countryExplorer.statusResolving || 'Resolving'
           : state === 'completed'
-          ? t.countryExplorer.statusCompleted || 'Completed'
-          : t.countryExplorer.statusNotResolved || 'Not Resolved';
+            ? t.countryExplorer.statusCompleted || 'Completed'
+            : t.countryExplorer.statusNotResolved || 'Not Resolved';
 
       return <Badge status={badgeStatus} title={title} />;
     },
@@ -271,6 +290,53 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
       fetchCountryData(selectedCountry);
     }
   }, [selectedCountry]);
+
+  // Inject dynamic Schema.org Dataset JSON-LD for AI Search & Answer Engines (AEO/GEO)
+  useEffect(() => {
+    if (!data) return;
+    const scriptId = 'country-ip-dataset-schema';
+    let script = document.getElementById(scriptId) as HTMLScriptElement | null;
+    if (!script) {
+      script = document.createElement('script');
+      script.id = scriptId;
+      script.type = 'application/ld+json';
+      document.head.appendChild(script);
+    }
+    const schemaData = {
+      '@context': 'https://schema.org',
+      '@type': 'Dataset',
+      'name': `${data.countryName} IP Delegations and CIDR Allocation Directory`,
+      'description': `Complete delegated IPv4 (${data.ipv4Count}) and IPv6 (${data.ipv6Count}) prefixes for ${data.countryName} (${data.countryCode}) with multi-format firewall rule generation.`,
+      'url': `https://ip-hub.ir/country/${data.countryCode.toUpperCase()}`,
+      'license': 'https://opensource.org/licenses/MIT',
+      'isAccessibleForFree': true,
+      'creator': {
+        '@type': 'Organization',
+        'name': 'IP-Hub',
+        'url': 'https://ip-hub.ir/'
+      },
+      'variableMeasured': [
+        'IPv4 CIDR prefixes',
+        'IPv6 CIDR prefixes',
+        'Origin ASNs',
+        'Estimated IPv4 address capacity'
+      ],
+      'distribution': [
+        {
+          '@type': 'DataDownload',
+          'encodingFormat': 'text/plain',
+          'name': `${data.countryName} Firewall Rule Direct Download`,
+          'contentUrl': `https://ip-hub.ir${downloadUrl || `/dl?country=${data.countryCode}&format=mikrotik`}`
+        }
+      ]
+    };
+    script.textContent = JSON.stringify(schemaData);
+
+    return () => {
+      const el = document.getElementById(scriptId);
+      if (el) el.remove();
+    };
+  }, [data, downloadUrl]);
 
   // Sync countryCode prop changes from URL/parent
   useEffect(() => {
@@ -481,24 +547,6 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
     if (!generatedScript.text) return;
     downloadText(generatedScript.filename, generatedScript.text);
   };
-
-  // Construct direct download link: /dl?country=IR&format=mikrotik&version=ipv4&access=allow
-  const downloadUrl = useMemo(() => {
-    if (!selectedCountry || !format) return '';
-    const params = new URLSearchParams();
-    params.set('country', selectedCountry);
-    params.set('format', format);
-    if (ipVersion && ipVersion !== 'any') {
-      params.set('version', ipVersion);
-    }
-    params.set('access', accessType);
-    if (customListName && customListName !== selectedCountry) {
-      params.set('listName', customListName);
-    }
-    return `/dl?${params.toString()}`;
-  }, [selectedCountry, format, ipVersion, accessType, customListName]);
-
-  const [isLinkCopied, setIsLinkCopied] = useState<boolean>(false);
 
   const handleCopyDownloadLink = () => {
     if (!downloadUrl) return;
@@ -1008,6 +1056,100 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
                 showSizeChanger: false,
               }}
             />
+          </Card>
+        ) : null}
+
+        {/* AI & Technical Intelligence Summary Card (GEO / AEO Citability) */}
+        {data ? (
+          <Card
+            title={
+              <Space orientation="horizontal" size={8}>
+                <RobotOutlined style={{ color: token.colorPrimary, fontSize: 18 }} />
+                <span style={{ fontWeight: 700 }}>{t.countryExplorer.aiSummaryTitle || 'AI & Technical Intelligence Summary'}</span>
+                <Tag color="cyan" variant="filled">
+                  GEO / AEO Ready
+                </Tag>
+              </Space>
+            }
+          >
+            <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+              <Alert
+                type="info"
+                showIcon
+                message={t.countryExplorer.directAnswerLabel || 'Direct Answer & Semantic Triples'}
+                description={
+                  <div style={{ lineHeight: 1.7, fontSize: 13 }}>
+                    <strong>{data.countryName} ({data.countryCode})</strong> currently maintains{' '}
+                    <strong>{data.ipv4Count.toLocaleString()}</strong> delegated IPv4 CIDR blocks covering an estimated{' '}
+                    <strong>{(data.totalEstimatedIpv4Addresses ?? 0).toLocaleString()}</strong> routable host addresses, alongside{' '}
+                    <strong>{data.ipv6Count.toLocaleString()}</strong> delegated IPv6 prefixes routed across{' '}
+                    <strong>{data.asnCount.toLocaleString()}</strong> Autonomous System Numbers (ASNs).
+                  </div>
+                }
+              />
+
+              <div style={{ marginTop: 8 }}>
+                <Typography.Text strong style={{ display: 'block', marginBottom: 8 }}>
+                  <CodeOutlined style={{ marginInlineEnd: 6, color: token.colorPrimary }} />
+                  {t.countryExplorer.cliIntegrationLabel || 'Direct RouterOS & CLI Commands'}
+                </Typography.Text>
+                <div
+                  style={{
+                    background: token.colorFillAlter,
+                    padding: '12px 14px',
+                    borderRadius: token.borderRadiusLG,
+                    border: `1px solid ${token.colorBorderSecondary}`,
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}
+                >
+                  <div style={{ color: token.colorTextSecondary }}>
+                    # MikroTik RouterOS (Auto-Download & Import):
+                  </div>
+                  <div style={{ color: token.colorPrimary, wordBreak: 'break-all' }}>
+                    /tool fetch url="https://ip-hub.ir{downloadUrl || `/dl?country=${data.countryCode}&format=mikrotik`}" mode=https dst-path={generatedScript.filename || `${data.countryCode.toLowerCase()}_mikrotik.rsc`}; /import {generatedScript.filename || `${data.countryCode.toLowerCase()}_mikrotik.rsc`}
+                  </div>
+                  <div style={{ color: token.colorTextSecondary, marginTop: 4 }}>
+                    # Linux curl / ipset:
+                  </div>
+                  <div style={{ color: token.colorSuccess, wordBreak: 'break-all' }}>
+                    curl -sSL "https://ip-hub.ir{downloadUrl ? downloadUrl.replace('format=' + format, 'format=ipset') : `/dl?country=${data.countryCode}&format=ipset`}" | sh
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 8 }}>
+                <Typography.Text strong style={{ display: 'block', marginBottom: 8 }}>
+                  <QuestionCircleOutlined style={{ marginInlineEnd: 6, color: token.colorWarning }} />
+                  {t.countryExplorer.faqBlockTitle || 'Frequently Asked Questions (FAQ)'}
+                </Typography.Text>
+                <Row gutter={[16, 16]}>
+                  <Col xs={24} md={12}>
+                    <Card size="small" style={{ background: token.colorFillQuaternary, height: '100%' }}>
+                      <Typography.Text strong style={{ display: 'block', marginBottom: 6 }}>
+                        {(t.countryExplorer.faqBlockQ1 || 'How to block all traffic from {country}?').replace('{country}', data.countryName)}
+                      </Typography.Text>
+                      <Typography.Paragraph type="secondary" style={{ margin: 0, fontSize: 12 }}>
+                        {(t.countryExplorer.faqBlockA1 || 'Download the {country} CIDR rules using IP-Hub with access policy set to deny.').replace('{country}', data.countryName)}
+                      </Typography.Paragraph>
+                    </Card>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Card size="small" style={{ background: token.colorFillQuaternary, height: '100%' }}>
+                      <Typography.Text strong style={{ display: 'block', marginBottom: 6 }}>
+                        {t.countryExplorer.faqBlockQ2 || 'How to automate country IP list downloads via script or API?'}
+                      </Typography.Text>
+                      <Typography.Paragraph type="secondary" style={{ margin: 0, fontSize: 12 }}>
+                        {(t.countryExplorer.faqBlockA2 || 'Use the IP-Hub direct download endpoint: https://ip-hub.ir/dl?country={code}').replace('{code}', data.countryCode)}
+                      </Typography.Paragraph>
+                    </Card>
+                  </Col>
+                </Row>
+              </div>
+            </Space>
           </Card>
         ) : null}
       </Space>

@@ -294,7 +294,16 @@ export const translations = {
       "loadError": "Failed to load Country IP Blocks",
       "apiError": "Error communicating with RIPEstat API.",
       "copyPrefix": "Copy prefix",
-      "openWhoisTooltip": "Open in WHOIS Inspector"
+      "openWhoisTooltip": "Open in WHOIS Inspector",
+      "aiSummaryTitle": "AI & Technical Intelligence Summary",
+      "aiSummaryDesc": "Fact-dense semantic summary and direct CLI integration commands for network engineers and AI answer engines.",
+      "directAnswerLabel": "Direct Answer & Semantic Triples",
+      "cliIntegrationLabel": "Direct RouterOS & CLI Commands",
+      "faqBlockTitle": "Frequently Asked Questions (FAQ)",
+      "faqBlockQ1": "How to block all traffic from {country}?",
+      "faqBlockA1": "Download the {country} CIDR rules using IP-Hub with access policy set to 'deny'. Apply the generated list in MikroTik RouterOS (/ip firewall filter add action=drop src-address-list=...), Cisco IOS ACL, or Linux ipset.",
+      "faqBlockQ2": "How to automate country IP list downloads via script or API?",
+      "faqBlockA2": "Use the IP-Hub direct download endpoint: https://ip-hub.ir/dl?country={code}&format=mikrotik&version=any&access=allow. This endpoint returns plain text scripts with custom list names and automatic MIME headers."
     },
     "batch": {
       "title": "Batch IP & Prefix Inspector",
@@ -767,7 +776,16 @@ export const translations = {
       "loadError": "خطا در دریافت لیست IPهای کشور",
       "apiError": "خطا در ارتباط با API سرویس RIPEstat.",
       "copyPrefix": "کپی پیشوند",
-      "openWhoisTooltip": "مشاهده در استعلام هویز"
+      "openWhoisTooltip": "مشاهده در استعلام هویز",
+      "aiSummaryTitle": "خلاصه فنی و مهندسی برای هوش مصنوعی",
+      "aiSummaryDesc": "خلاصه اطلاعات ساختاریافته و دستورات مستقیم CLI برای مهندسان شبکه و موتورهای پاسخ هوش مصنوعی.",
+      "directAnswerLabel": "خلاصه ساختاریافته و گزاره‌های معنایی",
+      "cliIntegrationLabel": "دستورات اتصال مستقیم در روتر و ترمینال",
+      "faqBlockTitle": "پرسش‌های متداول (FAQ)",
+      "faqBlockQ1": "چگونه تمام ترافیک {country} را مسدود کنیم؟",
+      "faqBlockA1": "قوانین CIDR کشور {country} را از طریق آی‌پی هاب با سیاست Deny دریافت کرده و در فایروال میکروتیک (/ip firewall filter add action=drop src-address-list=...)، سیسکو یا ipset لینوکس اعمال کنید.",
+      "faqBlockQ2": "چگونه دانلود خودکار لیست IP کشورها را در اسکریپت پیاده‌سازی کنیم؟",
+      "faqBlockA2": "می‌توانید از لینک مستقیم دانلود https://ip-hub.ir/dl?country={code}&format=mikrotik&version=any&access=allow استفاده کنید که اسکریپت آماده با نام لیست دلخواه تولید می‌کند."
     },
     "batch": {
       "title": "بررسی دسته‌جمعی IP و رنج‌ها",

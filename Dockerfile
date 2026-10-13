@@ -5,6 +5,9 @@ ARG VERSION=dev
 # ==========================================
 FROM node:alpine AS frontend-builder
 
+ARG VERSION
+ENV VITE_APP_VERSION=$VERSION
+
 WORKDIR /app/web
 
 COPY web/package.json web/package-lock.json* ./

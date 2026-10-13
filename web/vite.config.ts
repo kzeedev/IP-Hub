@@ -42,9 +42,30 @@ function flagIconsPlugin(): Plugin {
   };
 }
 
+function htmlVersionPlugin(): Plugin {
+  return {
+    name: 'vite-plugin-html-version',
+    transformIndexHtml(html) {
+      let version = process.env.VITE_APP_VERSION || process.env.VERSION;
+      if (!version) {
+        try {
+          const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
+          version = pkg.version;
+        } catch {
+          version = '2.2.0';
+        }
+      }
+      const cleanVer = (version || '2.2.0').replace(/^v/, '');
+      return html
+        .replace(/%APP_VERSION%/g, cleanVer)
+        .replace(/%VITE_APP_VERSION%/g, cleanVer);
+    },
+  };
+}
+
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss(), flagIconsPlugin()],
+    plugins: [react(), tailwindcss(), flagIconsPlugin(), htmlVersionPlugin()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),

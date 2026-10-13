@@ -152,41 +152,205 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Vazirmatn:wght@400;500;600;700&display=swap" />
   </noscript>
 
-  <!-- Schema.org JSON-LD -->
-  <script type="application/ld+json">
+  <!-- Schema.org JSON-LD (AEO/GEO Structured Data) -->
+  <script id="schema-jsonld" type="application/ld+json">
     [
       {
         "@context": "https://schema.org/",
-        "@type": "WebSite",
+        "@type": "Organization",
+        "@id": "https://ip-hub.ir/#organization",
         "name": "IP-Hub",
         "url": "https://ip-hub.ir/",
+        "logo": "https://ip-hub.ir/assets/img/logo.webp",
+        "sameAs": [
+          "https://github.com/kzeedev/IP-Hub",
+          "https://github.com/kzeedev"
+        ],
+        "description": "High-performance network intelligence platform, open-source country IP delegation directory, and edge firewall rule generator."
+      },
+      {
+        "@context": "https://schema.org/",
+        "@type": "WebSite",
+        "@id": "https://ip-hub.ir/#website",
+        "name": "IP-Hub",
+        "url": "https://ip-hub.ir/",
+        "publisher": {
+          "@id": "https://ip-hub.ir/#organization"
+        },
         "potentialAction": {
           "@type": "SearchAction",
-          "target": "https://ip-hub.ir/?q={search_term_string}",
+          "target": "https://ip-hub.ir/lookup/{search_term_string}",
           "query-input": "required name=search_term_string"
         }
       },
       {
         "@context": "https://schema.org/",
         "@type": "WebApplication",
+        "@id": "https://ip-hub.ir/#webapp",
         "name": "IP-Hub",
         "url": "https://ip-hub.ir/",
-        "description": "Country IP lists and firewall rule generator supporting MikroTik, Cisco ACL, FreeBSD PF, Linux ipset, htaccess, iptables, JSON, and real-time RIPE WHOIS inspection.",
-        "applicationCategory": "NetworkingApplication",
+        "publisher": {
+          "@id": "https://ip-hub.ir/#organization"
+        },
+        "applicationCategory": "NetworkSecurityApplication",
         "operatingSystem": "All",
-        "inLanguage": "en-US"
+        "inLanguage": "en-US",
+        "softwareVersion": "%APP_VERSION%",
+        "description": "Country IP lists and firewall rule generator supporting MikroTik RouterOS (.rsc), Cisco ACL (.txt), FreeBSD PF (.conf), Linux ipset (.sh), Apache .htaccess, and JSON formatters + real-time RIPE WHOIS inspection.",
+        "featureList": [
+          "Country-level IPv4 and IPv6 delegated CIDR block downloads",
+          "MikroTik address-list, Cisco ACL, FreeBSD PF, and Linux ipset script generation",
+          "Live RIPE WHOIS and BGP routing status lookup",
+          "Batch IP and ASN intelligence inspection",
+          "Subnet and CIDR calculator",
+          "RFC 9727 API catalog and AI agent content negotiation"
+        ]
       },
       {
         "@context": "https://schema.org/",
         "@type": "WebApplication",
+        "@id": "https://ip-hub.ir/fa#webapp",
         "name": "آی‌پی هاب",
         "url": "https://ip-hub.ir/fa",
-        "description": "مرجع لیست رنج IP کشورها، تولید اسکریپت فایروال میکروتیک، سیسکو و لینوکس، و استعلام آنلاین اطلاعات WHOIS و مسیریابی RIPE.",
-        "applicationCategory": "NetworkingApplication",
+        "publisher": {
+          "@id": "https://ip-hub.ir/#organization"
+        },
+        "applicationCategory": "NetworkSecurityApplication",
         "operatingSystem": "All",
-        "inLanguage": "fa-IR"
+        "inLanguage": "fa-IR",
+        "softwareVersion": "%APP_VERSION%",
+        "description": "مرجع لیست رنج IP کشورها، تولید اسکریپت فایروال میکروتیک، سیسکو و لینوکس، و استعلام آنلاین اطلاعات WHOIS و مسیریابی RIPE."
+      },
+      {
+        "@context": "https://schema.org/",
+        "@type": "SoftwareSourceCode",
+        "@id": "https://ip-hub.ir/#sourcecode",
+        "name": "IP-Hub Open Source Repository",
+        "codeRepository": "https://github.com/kzeedev/IP-Hub",
+        "programmingLanguage": ["Go", "TypeScript"],
+        "runtimePlatform": "Go 1.24 / Node.js",
+        "version": "%APP_VERSION%",
+        "license": "https://opensource.org/licenses/MIT",
+        "creator": {
+          "@id": "https://ip-hub.ir/#organization"
+        }
+      },
+      {
+        "@context": "https://schema.org/",
+        "@type": "Dataset",
+        "@id": "https://ip-hub.ir/#dataset-country-ips",
+        "name": "Global Country IP Delegations & CIDR Prefixes",
+        "description": "Real-time aggregated IPv4 and IPv6 network prefix allocations and Autonomous System Numbers (ASNs) delegated across all ISO 3166-1 alpha-2 countries, formatted for edge firewall deployments and network security filtering.",
+        "url": "https://ip-hub.ir/country-ips",
+        "license": "https://opensource.org/licenses/MIT",
+        "isAccessibleForFree": true,
+        "creator": {
+          "@id": "https://ip-hub.ir/#organization"
+        },
+        "variableMeasured": [
+          "Delegated IPv4 CIDR blocks",
+          "Delegated IPv6 CIDR blocks",
+          "Country Autonomous System Numbers (ASNs)",
+          "Estimated total host addresses"
+        ],
+        "distribution": [
+          {
+            "@type": "DataDownload",
+            "encodingFormat": "text/plain",
+            "name": "Direct Download API",
+            "contentUrl": "https://ip-hub.ir/dl?country=IR&format=mikrotik&version=any&access=allow"
+          },
+          {
+            "@type": "DataDownload",
+            "encodingFormat": "application/json",
+            "name": "Country IP JSON API",
+            "contentUrl": "https://ip-hub.ir/api/whois/country"
+          }
+        ]
+      },
+      {
+        "@context": "https://schema.org/",
+        "@type": "FAQPage",
+        "@id": "https://ip-hub.ir/#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is IP-Hub?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "IP-Hub is a high-performance, open-source network intelligence platform and country-level IP delegation directory. It allows network administrators to look up real-time RIPE WHOIS records, inspect BGP routing visibility, calculate CIDR subnets, and generate firewall address-lists for edge routers and firewalls."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How do I download country IP lists for MikroTik, Cisco, and Linux firewalls?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Navigate to the Country IP Explorer (https://ip-hub.ir/country-ips), choose any two-letter country code, and select your firewall target: MikroTik address-list (.rsc), Cisco ACL (.txt), FreeBSD PF (.conf), Linux ipset (.sh), Apache .htaccess, or JSON. You can also download rules directly via the /dl API endpoint (e.g. /dl?country=DE&format=mikrotik&version=ipv4&access=allow)."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does IP-Hub support direct downloads and API access for AI agents?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. IP-Hub provides dynamic markdown content negotiation via the HTTP Accept: text/markdown header, an active /llms.txt file, an OpenAPI 3.1 catalog at /.well-known/api-catalog, and a direct download endpoint at /dl."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What formats and access policies are supported by IP-Hub firewall scripts?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "IP-Hub supports MikroTik RouterOS (.rsc), Cisco IOS ACL (.txt), FreeBSD Packet Filter (.conf), Linux Netfilter ipset (.sh), Apache .htaccess, and JSON. All scripts allow filtering by IP version (any, ipv4, ipv6), specifying access policies (allow or deny), and customizing the address-list or ACL name."
+            }
+          }
+        ]
       }
     ]
+  </script>
+  <script>
+    (function () {
+      try {
+        fetch('/api/system/version')
+          .then(function (res) { return res.ok ? res.json() : null; })
+          .then(function (data) {
+            if (data && data.version) {
+              var ver = String(data.version).replace(/^v/, '');
+              var script = document.getElementById('schema-jsonld') || document.querySelector('script[type="application/ld+json"]');
+              if (script && script.textContent) {
+                var schemas = JSON.parse(script.textContent);
+                var updated = false;
+                var updateVersion = function (item) {
+                  if (!item || typeof item !== 'object') return;
+                  if (item['@type'] === 'WebApplication') {
+                    item.softwareVersion = ver;
+                    updated = true;
+                  } else if (item['@type'] === 'SoftwareSourceCode') {
+                    item.version = ver;
+                    updated = true;
+                  }
+                  for (var key in item) {
+                    if (Array.isArray(item[key])) item[key].forEach(updateVersion);
+                    else if (typeof item[key] === 'object') updateVersion(item[key]);
+                  }
+                };
+                if (Array.isArray(schemas)) schemas.forEach(updateVersion);
+                else updateVersion(schemas);
+                if (updated) {
+                  script.textContent = JSON.stringify(schemas, null, 2);
+                }
+              }
+            }
+          })
+          .catch(function () {
+            var script = document.getElementById('schema-jsonld') || document.querySelector('script[type="application/ld+json"]');
+            if (script && script.textContent && script.textContent.indexOf('%APP_VERSION%') !== -1) {
+              script.textContent = script.textContent.replace(/%APP_VERSION%/g, '2.2.0');
+            }
+          });
+      } catch (e) {}
+    })();
   </script>
 
   <!-- Google tag (gtag.js) -->

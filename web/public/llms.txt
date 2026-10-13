@@ -84,3 +84,47 @@
 - **Workflow**:
   - Enter any IPv4 or IPv6 prefix (e.g. `193.0.0.0/21` or `10.0.0.0/16`).
   - Compute network address, netmask, wildcard mask, broadcast address, first and last usable host IPs, and total usable host count.
+
+## Direct Download API & Script Automation
+
+IP-Hub provides a dedicated direct file download endpoint for automated edge router deployments, cron tasks, and CI/CD pipelines:
+
+- **Endpoint**: `https://ip-hub.ir/dl`
+- **Method**: `GET`
+- **Parameters**:
+  - `country` (required): Two-letter ISO 3166-1 alpha-2 country code (e.g. `IR`, `DE`, `US`).
+  - `format` (required): Target firewall or script format (`mikrotik`, `cisco`, `pf`, `freebsd-pf`, `ipset`, `htaccess`, `json`).
+  - `version` (optional, default `any`): IP version filter (`any`, `ipv4`, `ipv6`).
+  - `access` (optional, default `allow`): Access policy rule action (`allow`, `deny`).
+  - `listName` (optional, defaults to country code): Custom address-list or ACL identifier.
+
+### Supported Formats & File Extensions
+
+| Format ID | Target Firewall / Platform | File Extension | Content Type |
+|---|---|---|---|
+| `mikrotik` | MikroTik RouterOS `/ip firewall address-list` | `.rsc` | `text/plain` |
+| `cisco` | Cisco IOS Standard ACL | `.txt` | `text/plain` |
+| `freebsd-pf` / `pf` | FreeBSD / OpenBSD Packet Filter Table | `.conf` | `text/plain` |
+| `ipset` | Linux Netfilter ipset (`hash:net`) | `.sh` | `text/plain` |
+| `htaccess` | Apache HTTP Server `<RequireAll>` | `.txt` | `text/plain` |
+| `json` | Structured JSON CIDR Array | `.json` | `application/json` |
+
+### Automation Examples
+
+- **MikroTik RouterOS Terminal**:
+  ```rsc
+  /tool fetch url="https://ip-hub.ir/dl?country=IR&format=mikrotik&version=ipv4&access=allow" mode=https dst-path=ir.rsc; /import ir.rsc
+  ```
+- **Linux Bash / ipset**:
+  ```bash
+  curl -sSL "https://ip-hub.ir/dl?country=IR&format=ipset&version=any&access=deny" | sh
+  ```
+
+## AI Agent Integration & Semantic Grounding
+
+- **Repository**: [https://github.com/kzeedev/IP-Hub](https://github.com/kzeedev/IP-Hub)
+- **License**: MIT Open Source License
+- **Content Negotiation**: Send `Accept: text/markdown` on any page to receive structured Markdown rather than HTML.
+- **API Catalog**: RFC 9727 linkset catalog available at `https://ip-hub.ir/.well-known/api-catalog`.
+- **OpenAPI 3.1 Documentation**: Interactive docs available at `https://ip-hub.ir/docs` and OpenAPI JSON at `https://ip-hub.ir/openapi.json`.
+
