@@ -44,19 +44,19 @@
 
   <!-- 3. Batch CIDR & IP Inspector -->
   <url>
-    <loc>https://ip-hub.ir/batch</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://ip-hub.ir/batch"/>
-    <xhtml:link rel="alternate" hreflang="fa" href="https://ip-hub.ir/fa/batch"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://ip-hub.ir/batch"/>
+    <loc>https://ip-hub.ir/batch-inspector</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ip-hub.ir/batch-inspector"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://ip-hub.ir/fa/batch-inspector"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ip-hub.ir/batch-inspector"/>
     <lastmod>2026-08-19</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://ip-hub.ir/fa/batch</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://ip-hub.ir/batch"/>
-    <xhtml:link rel="alternate" hreflang="fa" href="https://ip-hub.ir/fa/batch"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://ip-hub.ir/batch"/>
+    <loc>https://ip-hub.ir/fa/batch-inspector</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ip-hub.ir/batch-inspector"/>
+    <xhtml:link rel="alternate" hreflang="fa" href="https://ip-hub.ir/fa/batch-inspector"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ip-hub.ir/batch-inspector"/>
     <lastmod>2026-08-19</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>

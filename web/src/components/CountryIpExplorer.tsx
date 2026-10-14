@@ -1156,3 +1156,5 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
     </div>
   );
 };
+
+export default CountryIpExplorer;

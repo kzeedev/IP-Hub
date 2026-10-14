@@ -173,16 +173,19 @@ func (h *Handler) generateMarkdownForRoute(c fiber.Ctx) string {
 	}
 
 	switch first {
-	case "country", "countries", "country-ips":
+	case "country":
 		if rest != "" {
 			return h.renderCountryMarkdown(rest, lang)
 		}
+		return h.renderHomeMarkdown(lang)
+
+	case "country-ips":
 		return h.renderCountryListMarkdown(lang)
 
-	case "batch", "batch-inspector":
+	case "batch-inspector":
 		return h.renderBatchMarkdown(lang)
 
-	case "subnet-calc", "subnet", "calculator":
+	case "subnet-calc":
 		query := rest
 		if query == "" {
 			if qIP := c.Query("ip"); qIP != "" {
@@ -197,16 +200,16 @@ func (h *Handler) generateMarkdownForRoute(c fiber.Ctx) string {
 		}
 		return h.renderSubnetCalcGuideMarkdown(lang)
 
-	case "source", "about":
+	case "source":
 		return h.renderSourceMarkdown(lang)
 
-	case "issues", "bugs":
+	case "issues":
 		return h.renderIssuesMarkdown(lang)
 
 	case "settings":
 		return h.renderSettingsMarkdown(lang)
 
-	case "lookup", "ip", "asn", "prefix":
+	case "lookup":
 		query := rest
 		if query == "" {
 			query = c.Query("q")
@@ -217,9 +220,6 @@ func (h *Handler) generateMarkdownForRoute(c fiber.Ctx) string {
 		return h.renderLookupGuideMarkdown(lang)
 
 	default:
-		if h.svc.IsAsnQuery(first) || strings.Contains(first, ".") || strings.Contains(first, ":") {
-			return h.renderLookupMarkdown(first, lang)
-		}
 		return h.renderHomeMarkdown(lang)
 	}
 }
@@ -239,7 +239,7 @@ description: پلتفرم متن‌باز و پرسرعت هوش شبکه، اس
 
 - **دایرکتوری آی‌پی کشورها**: [https://ip-hub.ir/fa/country-ips](https://ip-hub.ir/fa/country-ips) یا کد کشور مانند [https://ip-hub.ir/fa/country/IR](https://ip-hub.ir/fa/country/IR)
 - **استعلام هویز و روتینگ BGP**: [https://ip-hub.ir/fa/lookup](https://ip-hub.ir/fa/lookup) (پشتیبانی از IPv4، IPv6 و شماره ASN مانند /fa/lookup/1.1.1.1 یا /fa/lookup/AS13335)
-- **بررسی دسته‌ای هویز (Batch)**: [https://ip-hub.ir/fa/batch](https://ip-hub.ir/fa/batch)
+- **بررسی دسته‌ای هویز (Batch)**: [https://ip-hub.ir/fa/batch-inspector](https://ip-hub.ir/fa/batch-inspector)
 - **محاسبه‌گر ساب‌نت CIDR**: [https://ip-hub.ir/fa/subnet-calc](https://ip-hub.ir/fa/subnet-calc)
 - **مستندات و سورس‌کد**: [https://ip-hub.ir/fa/source](https://ip-hub.ir/fa/source)
 - **گزارش خطا و بازخورد**: [https://ip-hub.ir/fa/issues](https://ip-hub.ir/fa/issues)
@@ -285,7 +285,7 @@ image: https://ip-hub.ir/assets/img/logo.webp
 
 - **Country IP Explorer**: [https://ip-hub.ir/country-ips](https://ip-hub.ir/country-ips) or by ISO code such as [https://ip-hub.ir/country/IR](https://ip-hub.ir/country/IR), [https://ip-hub.ir/country/DE](https://ip-hub.ir/country/DE), [https://ip-hub.ir/country/US](https://ip-hub.ir/country/US).
 - **Single WHOIS & ASN Lookup**: [https://ip-hub.ir/lookup](https://ip-hub.ir/lookup) (supports IPv4, IPv6, CIDR blocks, and ASNs like ` + "`/lookup/1.1.1.1`" + ` or ` + "`/lookup/AS13335`" + `).
-- **Batch WHOIS Inspector**: [https://ip-hub.ir/batch](https://ip-hub.ir/batch) (concurrent lookup of up to 50 mixed targets).
+- **Batch WHOIS Inspector**: [https://ip-hub.ir/batch-inspector](https://ip-hub.ir/batch-inspector) (concurrent lookup of up to 50 mixed targets).
 - **CIDR Subnet Calculator**: [https://ip-hub.ir/subnet-calc](https://ip-hub.ir/subnet-calc) (interactive or direct ` + "`/subnet-calc/192.168.1.0/24`" + `).
 - **Source Code & Architecture**: [https://ip-hub.ir/source](https://ip-hub.ir/source).
 - **Issue Tracker**: [https://ip-hub.ir/issues](https://ip-hub.ir/issues).

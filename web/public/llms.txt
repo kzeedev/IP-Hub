@@ -6,7 +6,7 @@
 
 - [Country IP Explorer](https://ip-hub.ir/country-ips): Explore and download delegated IPv4 & IPv6 address prefixes by ISO country code, with multi-format firewall generator scripts.
 - [Single WHOIS & ASN Lookup](https://ip-hub.ir/): Real-time delegated IP prefix lookup, BGP routing inspection, abuse contact retrieval, and RIPE database objects.
-- [Batch WHOIS Inspector](https://ip-hub.ir/batch): Concurrently query and audit up to 50 IP addresses, CIDR blocks, or ASNs with CSV/JSON export.
+- [Batch WHOIS Inspector](https://ip-hub.ir/batch-inspector): Concurrently query and audit up to 50 IP addresses, CIDR blocks, or ASNs with CSV/JSON export.
 - [CIDR Subnet Calculator](https://ip-hub.ir/subnet-calc): Calculate network bounds, netmask, wildcard mask, broadcast address, and usable host ranges.
 - [Source Code & Documentation](https://ip-hub.ir/source): Open-source repository, license, and technical documentation.
 - [Issue Tracker & Bug Reports](https://ip-hub.ir/issues): Community issue submission and feature requests.

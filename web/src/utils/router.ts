@@ -52,24 +52,34 @@ export function parseRoute(
   const first = segments[0].toLowerCase();
   const rest = segments.slice(1).join('/');
 
-  if (first === 'country' || first === 'countries' || first === 'country-ips') {
-    const countryCode = rest ? rest.toUpperCase() : undefined;
+  if (first === 'country-ips') {
+    if (rest) {
+      return { view: 'not-found', lang };
+    }
+    return { view: 'country-ips', lang };
+  }
+
+  if (first === 'country') {
+    if (!rest || segments.length > 2) {
+      return { view: 'not-found', lang };
+    }
+    const countryCode = rest.toUpperCase();
     return { view: 'country-ips', countryCode, lang };
   }
 
-  if (first === 'batch' || first === 'batch-inspector') {
+  if (first === 'batch-inspector') {
     return { view: 'batch', lang };
   }
 
-  if (first === 'subnet-calc' || first === 'subnet' || first === 'calculator') {
+  if (first === 'subnet-calc') {
     return { view: 'subnet-calc', query: rest ? decodeURIComponent(rest) : undefined, lang };
   }
 
-  if (first === 'source' || first === 'about') {
+  if (first === 'source') {
     return { view: 'source', lang };
   }
 
-  if (first === 'issues' || first === 'bugs') {
+  if (first === 'issues') {
     return { view: 'issues', lang };
   }
 
@@ -77,7 +87,7 @@ export function parseRoute(
     return { view: 'settings', lang };
   }
 
-  if (first === 'lookup' || first === 'ip' || first === 'asn' || first === 'prefix') {
+  if (first === 'lookup') {
     return { view: 'lookup', query: rest ? decodeURIComponent(rest) : undefined, lang };
   }
 
@@ -101,7 +111,7 @@ export function getRouteUrl(
       subPath = opts.countryCode ? `/country/${encodeURIComponent(opts.countryCode.toUpperCase())}` : '/country-ips';
       break;
     case 'batch':
-      subPath = '/batch';
+      subPath = '/batch-inspector';
       break;
     case 'subnet-calc':
       subPath = '/subnet-calc';

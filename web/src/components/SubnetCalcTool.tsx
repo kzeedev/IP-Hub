@@ -231,3 +231,5 @@ export const SubnetCalcTool: React.FC = () => {
     </div>
   );
 };
+
+export default SubnetCalcTool;

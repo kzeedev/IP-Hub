@@ -146,3 +146,5 @@ export const SourceView: React.FC = () => {
     </div>
   );
 };
+
+export default SourceView;

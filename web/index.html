@@ -122,8 +122,13 @@
         if (s.length > 0 && (s[0] === 'fa' || s[0] === 'en')) {
           s.shift();
         }
-        var valid = ['country', 'countries', 'country-ips', 'batch', 'batch-inspector', 'subnet-calc', 'subnet', 'calculator', 'source', 'about', 'issues', 'bugs', 'settings', 'lookup', 'ip', 'asn', 'prefix'];
-        if (s.length > 0 && valid.indexOf(s[0]) === -1) {
+        var valid = ['country', 'country-ips', 'batch-inspector', 'subnet-calc', 'source', 'issues', 'settings', 'lookup'];
+        var isInvalid = s.length > 0 && (
+          valid.indexOf(s[0]) === -1 ||
+          (s[0] === 'country' && s.length < 2) ||
+          (s[0] === 'country-ips' && s.length > 1)
+        );
+        if (isInvalid) {
           var robots = document.querySelector('meta[name="robots"]');
           if (robots) robots.setAttribute('content', 'noindex, nofollow, noarchive');
           var canonical = document.querySelector('link[rel="canonical"]');
@@ -446,7 +451,7 @@
           <li style="margin-bottom: 8px;"><a href="/country-ips"
               style="color: var(--ant-primary);">Country IP Lists &amp; Firewall Generator</a> -
             Delegated IPv4 and IPv6 prefixes by country.</li>
-          <li style="margin-bottom: 8px;"><a href="/batch" style="color: var(--ant-primary);">Batch
+          <li style="margin-bottom: 8px;"><a href="/batch-inspector" style="color: var(--ant-primary);">Batch
               WHOIS &amp; ASN Inspector</a> - Concurrently audit multi-target IP addresses, CIDR blocks, and AS numbers.
           </li>
           <li style="margin-bottom: 8px;"><a href="/subnet-calc"

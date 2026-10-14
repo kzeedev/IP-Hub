@@ -289,3 +289,5 @@ export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle 
     </div>
   );
 };
+
+export default BatchInspector;

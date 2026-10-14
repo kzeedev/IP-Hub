@@ -90,8 +90,15 @@ export default defineConfig(() => {
           chunkFileNames: 'assets/[name].js',
           assetFileNames: 'assets/[name].[ext]',
           manualChunks(id) {
-            if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/scheduler')) {
+            const nid = id.replace(/\\/g, '/');
+            if (nid.includes('node_modules/react') || nid.includes('node_modules/react-dom') || nid.includes('node_modules/scheduler')) {
               return 'vendor-react';
+            }
+            if (nid.includes('node_modules/antd') || nid.includes('node_modules/@ant-design') || nid.includes('node_modules/rc-') || nid.includes('node_modules/@rc-component')) {
+              return 'vendor-antd';
+            }
+            if (nid.includes('src/i18n/') || nid.includes('src/utils/') || nid.includes('src/components/FlagIcon') || nid.includes('src/components/LanguageSelector')) {
+              return 'app-common';
             }
           },
         },

@@ -135,3 +135,5 @@ export const IssuesView: React.FC = () => {
     </div>
   );
 };
+
+export default IssuesView;

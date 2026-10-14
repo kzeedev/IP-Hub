@@ -31,3 +31,5 @@ export const NotFoundView: React.FC<NotFoundViewProps> = ({ onNavigate }) => {
     </div>
   );
 };
+
+export default NotFoundView;
