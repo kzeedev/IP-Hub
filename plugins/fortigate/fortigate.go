@@ -28,10 +28,10 @@ func (p *FortigatePlugin) Format(data pluginBase.Lookup, ipVersion pluginBase.IP
 	var IPv4, IPv6 string
 
 	if ipVersion == pluginBase.IPv4 || ipVersion == pluginBase.Any {
-		IPv4 = strings.Join(data.IPv4, ", ")
+		IPv4 = strings.Join(data.IPv4, "\n")
 	}
 	if ipVersion == pluginBase.IPv6 || ipVersion == pluginBase.Any {
-		IPv6 = strings.Join(data.IPv6, ", ")
+		IPv6 = strings.Join(data.IPv6, "\n")
 	}
 
 	switch ipVersion {
@@ -40,7 +40,7 @@ func (p *FortigatePlugin) Format(data pluginBase.Lookup, ipVersion pluginBase.IP
 	case pluginBase.IPv6:
 		return IPv6
 	default:
-		return fmt.Sprintf(`%v, %v`, IPv4, IPv6)
+		return fmt.Sprintf(`%v\n%v`, IPv4, IPv6)
 	}
 }
 
