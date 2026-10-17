@@ -56,16 +56,17 @@ RUN mkdir -p /dist/lib && \
     ln -sf ld-musl-x86_64.so.1 /dist/lib/libc.musl-x86_64.so.1; \
     fi
 
-# Setup directories, SSL certificates, public assets, and compiled frontend SPA
-RUN mkdir -p /dist/etc/ssl/certs /dist/web/public /dist/web/dist
+# Setup directories, SSL certificates, and compiled frontend SPA
+RUN mkdir -p /dist/etc/ssl/certs /dist/web/dist
 RUN cp /etc/ssl/certs/ca-certificates.crt /dist/etc/ssl/certs/
-RUN cp -r /build/web/public/* /dist/web/public/ 2>/dev/null || true
 COPY --from=frontend-builder /app/web/dist /dist/web/dist
 
 # ==========================================
 # Stage 3: Minimal Production Image
 # ==========================================
 FROM scratch AS final
+
+WORKDIR /
 
 COPY --from=backend-builder /dist /
 

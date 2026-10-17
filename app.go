@@ -130,12 +130,11 @@ func init() {
 
 	// Static assets
 	app.Use("/", static.New("./web/dist"))
-	app.Use("/public", static.New("./web/public"))
 	app.Use("/assets", static.New("./web/dist/assets"))
 
 	// Route non-API GET requests to SPA index.html
 	app.Get("*", func(c fiber.Ctx) error {
-		if strings.HasPrefix(c.Path(), "/api") || strings.HasPrefix(c.Path(), "/openapi") || strings.HasPrefix(c.Path(), "/docs") || strings.HasPrefix(c.Path(), "/schemas") || strings.HasPrefix(c.Path(), "/.well-known") || c.Path() == "/dl" {
+		if strings.HasPrefix(c.Path(), "/api") || strings.HasPrefix(c.Path(), "/assets") || strings.HasPrefix(c.Path(), "/openapi") || strings.HasPrefix(c.Path(), "/docs") || strings.HasPrefix(c.Path(), "/schemas") || strings.HasPrefix(c.Path(), "/.well-known") || c.Path() == "/dl" {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Endpoint not found"})
 		}
 		c.Set("Vary", "Accept")
