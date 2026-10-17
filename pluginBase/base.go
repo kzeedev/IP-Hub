@@ -7,6 +7,7 @@ type Lookup struct {
 	ASN         []string
 	IPv4        []string
 	IPv6        []string
+	PrefixORGs  map[string]string
 	UpdatedAt   string
 }
 

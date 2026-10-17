@@ -30,12 +30,14 @@ func (p *MikrotikPlugin) Format(data pluginBase.Lookup, ipVersion pluginBase.IPV
 
 	if ipVersion == pluginBase.IPv4 || ipVersion == pluginBase.Any {
 		for _, ip := range data.IPv4 {
-			IPv4 += fmt.Sprintf("add list=%v address=%v\n", listName, ip)
+			ipOrg := data.PrefixORGs[ip]
+			IPv4 += fmt.Sprintf("add list=%v address=%v comment=\"%v\"\n", listName, ip, ipOrg)
 		}
 	}
 	if ipVersion == pluginBase.IPv6 || ipVersion == pluginBase.Any {
 		for _, ip := range data.IPv6 {
-			IPv6 += fmt.Sprintf("add list=%v address=%v\n", listName, ip)
+			ipOrg := data.PrefixORGs[ip]
+			IPv6 += fmt.Sprintf("add list=%v address=%v comment=\"%v\"\n", listName, ip, ipOrg)
 		}
 	}
 

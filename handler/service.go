@@ -1164,6 +1164,7 @@ func (s *whoisService) FormatCountry(resource *models.CountryIpResource, format,
 		ASN:         asnStrs,
 		IPv4:        resource.IPv4,
 		IPv6:        resource.IPv6,
+		PrefixORGs:  resource.PrefixOrgs,
 		UpdatedAt:   resource.QueryTime,
 	}
 
