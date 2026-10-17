@@ -1,85 +1,16 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"net"
-	"net/http"
-	"net/url"
 	"path/filepath"
 	"plugin"
 	"strings"
-	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/kzeedev/IP-Hub/config"
-	"github.com/kzeedev/IP-Hub/models"
 	"github.com/kzeedev/IP-Hub/pluginBase"
-	country "github.com/mikekonan/go-countries"
 )
-
-var lookupHttpClient = &http.Client{
-	Timeout: 7 * time.Second,
-}
-
-func lookup(countryCode string) pluginBase.Lookup {
-	cleanCode := strings.ToUpper(strings.TrimSpace(countryCode))
-	// Validate ISO 3166-1 alpha-2 country code
-	if len(cleanCode) != 2 || cleanCode[0] < 'A' || cleanCode[0] > 'Z' || cleanCode[1] < 'A' || cleanCode[1] > 'Z' {
-		return pluginBase.Lookup{
-			CountryCode: cleanCode,
-			CountryName: "Invalid Country",
-		}
-	}
-
-	targetURL := fmt.Sprintf("%s%s", config.LookupEndpoint, url.QueryEscape(cleanCode))
-	req, err := http.NewRequest("GET", targetURL, nil)
-	if err != nil {
-		return pluginBase.Lookup{CountryCode: cleanCode}
-	}
-	req.Header.Set("User-Agent", "IP-Hub-Server/2.0")
-	req.Header.Set("Accept", "application/json")
-
-	res, err := lookupHttpClient.Do(req)
-	if err != nil {
-		fmt.Printf("Lookup HTTP error: %v\n", err)
-		return pluginBase.Lookup{CountryCode: cleanCode}
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return pluginBase.Lookup{CountryCode: cleanCode}
-	}
-
-	var response models.RipeResult
-	err = json.NewDecoder(res.Body).Decode(&response)
-	if err != nil {
-		fmt.Printf("Lookup JSON decode error: %v\n", err)
-		return pluginBase.Lookup{CountryCode: cleanCode}
-	}
-
-	countryName, ok := country.ByAlpha2Code(country.Alpha2Code(cleanCode))
-
-	result := pluginBase.Lookup{
-		UpdatedAt:   response.Data.QueryTime,
-		CountryCode: cleanCode,
-		ASN:         response.Data.Resources.Asn,
-		IPv4:        response.Data.Resources.Ipv4,
-		IPv6:        response.Data.Resources.Ipv6,
-	}
-	if ok {
-		result.CountryName = countryName.NameStr()
-	} else {
-		result.CountryName = cleanCode
-	}
-
-	return result
-}
-
-func arrayToString(array []string) string {
-	return strings.Join(array, " ")
-}
 
 func WalkDir(root string, ext string) ([]string, error) {
 	var files []string
