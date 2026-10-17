@@ -1,0 +1,48 @@
+# Version control & CI
+.git
+.gitignore
+.github
+
+# Environment files & Secrets
+.env
+.env.*
+!.env.example
+
+# Local Go binaries and build artifacts
+*.exe
+*.so
+*.dll
+IP-Hub
+IP-Hub.exe
+.gocache
+bin/
+dist/
+
+# Frontend dependencies and build outputs
+**/node_modules/
+**/dist/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# IDE, Editor, Tooling & Agent metadata
+.vscode/
+.idea/
+.localbuilder/
+.agents/
+.DS_Store
+*.swp
+*.swo
+*~
+skills-lock.json
+
+# Scratch, logs and temporary files
+scratch/
+tmp/
+temp/
+*.log
+
+# Project documentation & compose configurations
+docker-compose*.yml
+README.md
+LICENSE
