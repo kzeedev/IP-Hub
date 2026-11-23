@@ -75,6 +75,10 @@ export function parseRoute(
     return { view: 'subnet-calc', query: rest ? decodeURIComponent(rest) : undefined, lang };
   }
 
+  if (first === 'mcp') {
+    return { view: 'mcp', lang };
+  }
+
   if (first === 'source') {
     return { view: 'source', lang };
   }
@@ -115,6 +119,9 @@ export function getRouteUrl(
       break;
     case 'subnet-calc':
       subPath = '/subnet-calc';
+      break;
+    case 'mcp':
+      subPath = '/mcp';
       break;
     case 'source':
       subPath = '/source';
@@ -216,6 +223,11 @@ export function updateDocumentSeoMeta(
       desc = dict.subnetDesc;
       break;
 
+    case 'mcp':
+      title = dict.mcpTitle;
+      desc = dict.mcpDesc;
+      break;
+
     case 'source':
       title = dict.sourceTitle;
       desc = dict.sourceDesc;
@@ -227,8 +239,8 @@ export function updateDocumentSeoMeta(
       break;
 
     case 'settings':
-      title = (dict as any).settingsTitle || 'Settings | IP-Hub';
-      desc = (dict as any).settingsDesc || 'Customize your language, appearance, and check service status.';
+      title = dict.settingsTitle;
+      desc = dict.settingsDesc;
       break;
 
     case 'not-found':

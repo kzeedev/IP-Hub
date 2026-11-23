@@ -93,14 +93,15 @@ func init() {
 		}
 	}
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: allowedOrigins,
-		AllowHeaders: []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Forwarded-For", "CF-Connecting-IP"},
-		AllowMethods: []string{"GET", "POST", "HEAD", "OPTIONS"},
+		AllowOrigins:  allowedOrigins,
+		AllowHeaders:  []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Forwarded-For", "CF-Connecting-IP", "Mcp-Session-Id", "Last-Event-ID", "Mcp-Protocol-Version"},
+		ExposeHeaders: []string{"Mcp-Session-Id"},
+		AllowMethods:  []string{"GET", "POST", "DELETE", "HEAD", "OPTIONS"},
 	}))
 
 	// Rate limiting
 	app.Use("/api/whois/lookup", limiter.New(limiter.Config{
-		Max:        100,
+		Max:        50,
 		Expiration: 1 * time.Minute,
 	}))
 	app.Use("/api/whois/batch", limiter.New(limiter.Config{
@@ -110,6 +111,16 @@ func init() {
 	app.Use("/api", limiter.New(limiter.Config{
 		Max:        150,
 		Expiration: 1 * time.Minute,
+	}))
+	app.Use("/mcp", limiter.New(limiter.Config{
+		Max:        60,
+		Expiration: 1 * time.Minute,
+		KeyGenerator: func(c fiber.Ctx) string {
+			if cfIP := c.Get("CF-Connecting-IP"); cfIP != "" {
+				return cfIP
+			}
+			return c.IP()
+		},
 	}))
 
 	// Configure cache for static assets
@@ -124,6 +135,7 @@ func init() {
 
 	h := handler.New(handler.NewWhoisService())
 	h.SetupOpenAPI(app)
+	h.SetupMCP(app)
 
 	// Markdown for Agents content negotiation
 	app.Use(h.MarkdownNegotiationMiddleware())
@@ -133,6 +145,8 @@ func init() {
 	app.Use("/assets", static.New("./web/dist/assets"))
 
 	// Route non-API GET requests to SPA index.html
+	webDistFS := os.DirFS("./web/dist")
+	distFS := os.DirFS("./dist")
 	app.Get("*", func(c fiber.Ctx) error {
 		if strings.HasPrefix(c.Path(), "/api") || strings.HasPrefix(c.Path(), "/assets") || strings.HasPrefix(c.Path(), "/openapi") || strings.HasPrefix(c.Path(), "/docs") || strings.HasPrefix(c.Path(), "/schemas") || strings.HasPrefix(c.Path(), "/.well-known") || c.Path() == "/dl" {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Endpoint not found"})
@@ -140,9 +154,13 @@ func init() {
 		c.Set("Vary", "Accept")
 		c.Set("Cache-Control", "no-cache")
 		if _, err := os.Stat("./web/dist/index.html"); err == nil {
-			return c.SendFile("./web/dist/index.html")
+			return c.SendFile("index.html", fiber.SendFile{
+				FS: webDistFS,
+			})
 		}
-		return c.SendFile("./dist/index.html")
+		return c.SendFile("index.html", fiber.SendFile{
+			FS: distFS,
+		})
 	})
 }
 

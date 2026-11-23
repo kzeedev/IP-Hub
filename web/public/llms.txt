@@ -8,6 +8,7 @@
 - [Single WHOIS & ASN Lookup](https://ip-hub.ir/): Real-time delegated IP prefix lookup, BGP routing inspection, abuse contact retrieval, and RIPE database objects.
 - [Batch WHOIS Inspector](https://ip-hub.ir/batch-inspector): Concurrently query and audit up to 50 IP addresses, CIDR blocks, or ASNs with CSV/JSON export.
 - [CIDR Subnet Calculator](https://ip-hub.ir/subnet-calc): Calculate network bounds, netmask, wildcard mask, broadcast address, and usable host ranges.
+- [MCP Server & AI Agent Guide](https://ip-hub.ir/mcp): Connect Claude, Cursor, VS Code, and AI assistants directly to IP-Hub via the Model Context Protocol (MCP) Streamable HTTP transport (`https://ip-hub.ir/mcp`).
 - [Source Code & Documentation](https://ip-hub.ir/source): Open-source repository, license, and technical documentation.
 - [Issue Tracker & Bug Reports](https://ip-hub.ir/issues): Community issue submission and feature requests.
 
@@ -122,9 +123,12 @@ IP-Hub provides a dedicated direct file download endpoint for automated edge rou
 
 ## AI Agent Integration & Semantic Grounding
 
+- **MCP Server (Streamable HTTP)**: `https://ip-hub.ir/mcp` (Exposes 6 tools: `whois_lookup`, `country_resources`, `whois_batch`, `subnet_calculator`, `system_status`, `list_plugins`; 5 resources/templates including `iphub://country/{code}/rules/{format}`; and 7 bilingual English/Persian prompt templates including `country_ip_list_fa` / `لیست IP {country} برای {format}`).
 - **Repository**: [https://github.com/kzeedev/IP-Hub](https://github.com/kzeedev/IP-Hub)
 - **License**: MIT Open Source License
 - **Content Negotiation**: Send `Accept: text/markdown` on any page to receive structured Markdown rather than HTML.
+- **API Catalog**: RFC 9727 linkset catalog available at `https://ip-hub.ir/.well-known/api-catalog`.
+- **OpenAPI 3.1 Documentation**: Interactive docs available at `https://ip-hub.ir/docs` and OpenAPI JSON at `https://ip-hub.ir/openapi.json`.
 - **API Catalog**: RFC 9727 linkset catalog available at `https://ip-hub.ir/.well-known/api-catalog`.
 - **OpenAPI 3.1 Documentation**: Interactive docs available at `https://ip-hub.ir/docs` and OpenAPI JSON at `https://ip-hub.ir/openapi.json`.
 

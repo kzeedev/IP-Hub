@@ -3,6 +3,7 @@ export type ActiveView =
   | 'country-ips'
   | 'batch'
   | 'subnet-calc'
+  | 'mcp'
   | 'source'
   | 'issues'
   | 'settings'

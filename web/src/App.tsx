@@ -35,6 +35,7 @@ import { parseRoute, navigateRoute, updateDocumentSeoMeta } from './utils/router
 const CountryIpExplorer = lazy(() => import('./components/CountryIpExplorer').then(m => ({ default: m.CountryIpExplorer || m.default })));
 const BatchInspector = lazy(() => import('./components/BatchInspector').then(m => ({ default: m.BatchInspector || m.default })));
 const SubnetCalcTool = lazy(() => import('./components/SubnetCalcTool').then(m => ({ default: m.SubnetCalcTool || m.default })));
+const McpView = lazy(() => import('./components/McpView').then(m => ({ default: m.McpView || m.default })));
 const SourceView = lazy(() => import('./components/SourceView').then(m => ({ default: m.SourceView || m.default })));
 const IssuesView = lazy(() => import('./components/IssuesView').then(m => ({ default: m.IssuesView || m.default })));
 const NotFoundView = lazy(() => import('./components/NotFoundView').then(m => ({ default: m.NotFoundView || m.default })));
@@ -532,6 +533,7 @@ export default function App() {
                 )}
 
                 {activeView === 'subnet-calc' && <SubnetCalcTool />}
+                {activeView === 'mcp' && <McpView />}
                 {activeView === 'source' && <SourceView />}
                 {activeView === 'issues' && <IssuesView />}
                 {activeView === 'settings' && (
@@ -651,6 +653,9 @@ export default function App() {
                 </Button>
                 <Button type="link" size="small" onClick={() => handleNavigateView('batch')}>
                   {t.nav.batch}
+                </Button>
+                <Button type="link" size="small" onClick={() => handleNavigateView('mcp')}>
+                  {t.nav.mcp}
                 </Button>
                 <Button type="link" size="small" onClick={() => handleNavigateView('source')}>
                   {t.nav.source}

@@ -203,6 +203,9 @@ func (h *Handler) generateMarkdownForRoute(c fiber.Ctx) string {
 	case "source":
 		return h.renderSourceMarkdown(lang)
 
+	case "mcp":
+		return h.renderMcpMarkdown(lang)
+
 	case "issues":
 		return h.renderIssuesMarkdown(lang)
 
@@ -883,4 +886,110 @@ description: Display language, theme preferences, and service status.
 - **Version**: %s
 - **Supported Languages**: English (en) and Persian (fa)
 `, config.Version)
+}
+
+func (h *Handler) renderMcpMarkdown(lang string) string {
+	if strings.EqualFold(lang, "fa") {
+		return `---
+title: راهنمای سرور MCP آی‌پی هاب - اتصال هوش مصنوعی به WHOIS و لیست IP کشورها برای میکروتیک
+description: مستندات اتصال Claude، Cursor و VS Code به سرور MCP آی‌پی هاب (https://ip-hub.ir/mcp) برای استعلام زنده RIPE WHOIS، مسیریابی BGP و تولید لیست IP ایران برای میکروتیک و سیسکو.
+---
+
+# سرور هوش مصنوعی MCP آی‌پی هاب (Model Context Protocol)
+
+> سرور MCP آی‌پی هاب در آدرس ` + "`https://ip-hub.ir/mcp`" + ` از پروتکل استاندارد **Streamable HTTP** پشتیبانی می‌کند و به دستیارهای هوش مصنوعی (Claude، Cursor، VS Code Copilot، Windsurf و ایجنت‌های LLM) اجازه می‌دهد بدون نیاز به کلید API، به ۶ ابزار شبکه، ۵ منبع داده و ۷ قالب پرامپت دوزبانه (شامل قالب پرکاربرد **«لیست IP {country} برای {format}»**) دسترسی مستقیم داشته باشند.
+
+## نحوه اتصال در کلاینت‌های هوش مصنوعی
+
+### Cursor IDE (` + "`.cursor/mcp.json`" + `)
+` + "```json\n" + `{
+  "mcpServers": {
+    "ip-hub": {
+      "url": "https://ip-hub.ir/mcp"
+    }
+  }
+}` + "\n```\n\n" + `### VS Code / GitHub Copilot (` + "`.vscode/mcp.json`" + `)
+` + "```json\n" + `{
+  "servers": {
+    "ip-hub": {
+      "type": "http",
+      "url": "https://ip-hub.ir/mcp"
+    }
+  }
+}` + "\n```\n\n" + `### Claude Code CLI
+` + "```bash\n" + `claude mcp add --transport http ip-hub https://ip-hub.ir/mcp` + "\n```\n\n" + `## ابزارهای سرور (MCP Tools)
+
+1. **` + "`whois_lookup`" + `**: استعلام جامع RIPE WHOIS، موقعیت جغرافیایی، ایمیل Abuse و وضعیت مسیریابی BGP برای IP، ASN یا CIDR.
+2. **` + "`country_resources`" + `**: دریافت رنج‌های IPv4/IPv6 و ASNهای کشورها (با پشتیبانی از نام فارسی/انگلیسی کشور یا کد ISO) و تولید قوانین فایروال (` + "`mikrotik`" + `، ` + "`cisco`" + `، ` + "`ipset`" + `، ` + "`freebsd-pf`" + `، ` + "`fortigate`" + `، ` + "`htaccess`" + `، ` + "`json`" + `).
+3. **` + "`whois_batch`" + `**: بررسی هم‌زمان تا ۵۰ آدرس IP به صورت موازی.
+4. **` + "`subnet_calculator`" + `**: محاسبه مهندسی ساب‌نت، Netmask، وایلدکارد مسک سیسکو و بازه هاست‌ها.
+5. **` + "`system_status`" + `**: وضعیت نسخه سرور، ارتباط با RIPE Stat و صف تکمیل نام سرویس‌دهندگان.
+6. **` + "`list_plugins`" + `**: فهرست پلاگین‌ها و فرمت‌های خروجی فایروال.
+
+## قالب‌های پرامپت دوزبانه (MCP Prompts)
+
+- **` + "`country_ip_list_fa`" + `**: قالب پویا **«لیست IP {country} برای {format}»** (مثال: لیست IP ایران برای میکروتیک، لیست IP آلمان برای سیسکو).
+- **` + "`generate_country_firewall_config`" + `**: قالب **«{country} IP List for {format}»**.
+- **` + "`ddos_geoip_mitigation_guide`" + `**: راهنمای مقابله با حملات DDoS با لیست IP کشورها.
+- **` + "`investigate_network_resource`" + `**: بررسی امنیتی و مسیریابی BGP برای IP/ASN/CIDR.
+- **` + "`batch_ip_security_triage`" + `**: تحلیل گروهی لاگ امنیتی و آدرس‌های IP.
+- **` + "`asn_bgp_peering_analysis`" + `**: تحلیل پیشوندهای BGP یک شماره ASN.
+- **` + "`subnet_planning_assistant`" + `**: دستیار طراحی و محاسبه ساب‌نت CIDR.
+`
+	}
+
+	return `---
+title: IP-Hub MCP Server Guide - Model Context Protocol for RIPE WHOIS, BGP & Firewall Rules
+description: Connect Claude, Cursor, VS Code, and AI agents to the IP-Hub MCP Server (https://ip-hub.ir/mcp) via Streamable HTTP for live RIPE WHOIS, BGP routing, and country firewall rules.
+---
+
+# IP-Hub Model Context Protocol (MCP) Server
+
+> The IP-Hub MCP Server is available at ` + "`https://ip-hub.ir/mcp`" + ` over the standard **Streamable HTTP** transport. It enables AI assistants (Claude Desktop, Claude Code, Cursor, VS Code Copilot, Windsurf, Cline) to invoke 6 live network intelligence tools, read 5 static and templated URI resources, and use 7 bilingual (English & Persian) prompt templates with zero authentication required.
+
+## Quick Start Configuration
+
+### Cursor IDE (` + "`.cursor/mcp.json`" + `)
+` + "```json\n" + `{
+  "mcpServers": {
+    "ip-hub": {
+      "url": "https://ip-hub.ir/mcp"
+    }
+  }
+}` + "\n```\n\n" + `### VS Code / GitHub Copilot (` + "`.vscode/mcp.json`" + `)
+` + "```json\n" + `{
+  "servers": {
+    "ip-hub": {
+      "type": "http",
+      "url": "https://ip-hub.ir/mcp"
+    }
+  }
+}` + "\n```\n\n" + `### Claude Code CLI
+` + "```bash\n" + `claude mcp add --transport http ip-hub https://ip-hub.ir/mcp` + "\n```\n\n" + `## Available MCP Tools (6 Tools)
+
+1. **` + "`whois_lookup`" + `** (` + "`query`" + `): Real-time RIPE WHOIS ownership, geolocation, abuse contacts, and BGP routing status for any IPv4, IPv6, ASN, or CIDR prefix.
+2. **` + "`country_resources`" + `** (` + "`code`" + `, ` + "`format`" + `, ` + "`version`" + `, ` + "`access`" + `, ` + "`listName`" + `): Fetches delegated IPv4/IPv6 CIDR blocks and ASNs for any country (accepts English/Persian country names or 2-letter ISO codes) and generates firewall rules (` + "`mikrotik`" + `, ` + "`cisco`" + `, ` + "`freebsd-pf`" + `, ` + "`ipset`" + `, ` + "`fortigate`" + `, ` + "`htaccess`" + `, ` + "`json`" + `).
+3. **` + "`whois_batch`" + `** (` + "`items`" + `): Parallel inspection of up to 50 IPv4/IPv6 addresses.
+4. **` + "`subnet_calculator`" + `** (` + "`ip`" + `, ` + "`cidr`" + `): Computes network address, broadcast address, netmask, Cisco wildcard mask, usable host range, and host capacity.
+5. **` + "`system_status`" + `**: Returns IP-Hub version, RIPE Stat API reachability, and background resolver queue progress.
+6. **` + "`list_plugins`" + `**: Lists available firewall rule formatting plugins and export formats.
+
+## MCP Resources & URI Templates
+
+- ` + "`iphub://country/{code}`" + ` (` + "`application/json`" + `)
+- ` + "`iphub://country/{code}/rules/{format}`" + ` (` + "`text/plain`" + ` / ` + "`application/json`" + `)
+- ` + "`iphub://system/status`" + ` (` + "`application/json`" + `)
+- ` + "`iphub://system/plugins`" + ` (` + "`application/json`" + `)
+- ` + "`iphub://docs/llms.txt`" + ` (` + "`text/markdown`" + `)
+
+## Parameterized Bilingual MCP Prompts
+
+- **` + "`country_ip_list_fa`" + `**: Parameterized Persian template ` + "`لیست IP {country} برای {format}`" + `.
+- **` + "`generate_country_firewall_config`" + `**: Parameterized template ` + "`{country} IP List for {format}`" + `.
+- **` + "`ddos_geoip_mitigation_guide`" + `**: GeoIP DDoS mitigation playbook for ` + "`{country}`" + ` on ` + "`{format}`" + `.
+- **` + "`investigate_network_resource`" + `**: Deep WHOIS & BGP audit for ` + "`{target}`" + `.
+- **` + "`batch_ip_security_triage`" + `**: Parallel log and threat triage for ` + "`{ips}`" + `.
+- **` + "`asn_bgp_peering_analysis`" + `**: BGP prefix portfolio analysis for ` + "`{asn}`" + `.
+- **` + "`subnet_planning_assistant`" + `**: CIDR subnet engineering breakdown for ` + "`{cidr}`" + `.
+`
 }

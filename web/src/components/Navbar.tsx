@@ -12,6 +12,7 @@ import {
   MoonOutlined,
   AimOutlined,
   ClusterOutlined,
+  ApiOutlined,
 } from '@ant-design/icons';
 import { ActiveView } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -52,6 +53,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { key: 'country-ips', label: t.nav.countryIps, icon: <GlobalOutlined />, id: 'nav-btn-country-ips' },
     { key: 'batch', label: t.nav.batch, icon: <UnorderedListOutlined />, id: 'nav-btn-batch' },
     { key: 'subnet-calc', label: t.nav.subnetCalc, icon: <CalculatorOutlined />, id: 'nav-btn-subnet' },
+    { key: 'mcp', label: t.nav.mcp, icon: <ApiOutlined />, id: 'nav-btn-mcp' },
     { key: 'source', label: t.nav.source, icon: <GithubOutlined />, id: 'nav-btn-source' },
     { key: 'issues', label: t.nav.issues, icon: <BugOutlined />, id: 'nav-btn-issues' },
   ];
@@ -73,13 +75,13 @@ export const Navbar: React.FC<NavbarProps> = ({
         borderBottom: `1px solid ${token.colorBorderSecondary}`,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56, gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56, gap: 8, width: '100%' }}>
         {/* Brand */}
         <a
           href={getRouteUrl('lookup', { lang: language })}
           hrefLang={language}
           onClick={(e) => handleNavClick(e, 'lookup')}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: 'inherit' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: 'inherit', flexShrink: 0 }}
         >
           <div
             style={{
@@ -96,7 +98,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <ClusterOutlined />
           </div>
-          <div>
+          <div style={{ whiteSpace: 'nowrap' }}>
             <span style={{ fontWeight: 700, fontSize: 16, color: token.colorTextHeading }}>
               {t.brand}
             </span>
@@ -107,8 +109,11 @@ export const Navbar: React.FC<NavbarProps> = ({
         </a>
 
         {/* Center Desktop Navigation */}
-        <div className="hidden xl:flex items-center">
-          <Space orientation="horizontal" size={4}>
+        <div
+          className="hidden xl:flex items-center overflow-x-auto scrollbar-none"
+          style={{ minWidth: 0, flex: 1, justifyContent: 'center' }}
+        >
+          <Space orientation="horizontal" size={2}>
             {navItems.map((item) => (
               <Button
                 key={item.key}
@@ -118,6 +123,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 size="middle"
                 href={getRouteUrl(item.key, { lang: language })}
                 onClick={(e) => handleNavClick(e, item.key)}
+                style={{ paddingInline: 10 }}
               >
                 {item.label}
               </Button>
@@ -126,7 +132,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Right Controls */}
-        <Space orientation="horizontal" size={8} align="center">
+        <Space orientation="horizontal" size={8} align="center" style={{ flexShrink: 0 }}>
           <LanguageSelector />
 
           <Tooltip title={isDarkTheme ? t.nav.themeLight : t.nav.themeDark}>

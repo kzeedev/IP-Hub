@@ -1,7 +1,8 @@
 name: ip-hub
 services:
   ip-hub:
-    image: ghcr.io/kzeedev/ip_hub:latest
+    build: .
+    container_name: ip_hub_app
     ports:
       - "${PORT}:${PORT}"
     environment:
@@ -21,7 +22,7 @@ services:
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 3s
       retries: 5
