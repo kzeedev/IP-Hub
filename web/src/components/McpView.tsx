@@ -32,6 +32,7 @@ import {
 } from '@ant-design/icons';
 import { useLanguage } from '../i18n/LanguageContext';
 import { copyToClipboard } from '../utils/helpers';
+import { upsertPageDatasetSchema, removePageDatasetSchema } from '../utils/datasetSchema';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -149,9 +150,82 @@ export const McpView: React.FC = () => {
     };
 
     scriptEl.textContent = JSON.stringify(schemaGraph);
+
+    const pageUrl = language === 'fa' ? 'https://ip-hub.ir/fa/mcp' : 'https://ip-hub.ir/mcp';
+    const inLang = language === 'fa' ? 'fa-IR' : 'en-US';
+    upsertPageDatasetSchema({
+      '@context': 'https://schema.org',
+      '@type': 'Dataset',
+      '@id': `${pageUrl}#dataset`,
+      name:
+        language === 'fa'
+          ? 'مجموعه داده ابزارها، منابع URI و قالب‌های پرامپت سرور MCP آی‌پی هاب'
+          : 'IP-Hub MCP Server Tools, URI Resources & Bilingual Prompt Templates Dataset',
+      description:
+        language === 'fa'
+          ? 'فهرست ساختاریافته ۶ ابزار هوش شبکه، ۵ منبع داده URI و ۷ قالب پرامپت دوزبانه در سرور Model Context Protocol آی‌پی هاب (https://ip-hub.ir/mcp).'
+          : 'Original catalog of 6 live network intelligence tools, 5 static and templated URI resources, and 7 bilingual prompt templates exposed by the IP-Hub Model Context Protocol (MCP) server at https://ip-hub.ir/mcp.',
+      url: pageUrl,
+      inLanguage: inLang,
+      license: 'https://opensource.org/licenses/MIT',
+      isAccessibleForFree: true,
+      creator: {
+        '@type': 'Organization',
+        '@id': 'https://ip-hub.ir/#organization',
+        name: 'IP-Hub',
+        url: 'https://ip-hub.ir/',
+      },
+      keywords: [
+        'Model Context Protocol',
+        'MCP Server',
+        'whois_lookup',
+        'country_resources',
+        'whois_batch',
+        'subnet_calculator',
+        'country_ip_list_fa',
+      ],
+      variableMeasured: [
+        {
+          '@type': 'PropertyValue',
+          name: 'MCP Endpoint URL',
+          value: canonicalEndpoint,
+        },
+        {
+          '@type': 'PropertyValue',
+          name: 'Registered MCP Tools (6)',
+          value: 'whois_lookup, country_resources, whois_batch, subnet_calculator, system_status, list_plugins',
+        },
+        {
+          '@type': 'PropertyValue',
+          name: 'Registered MCP Resources (5)',
+          value: 'iphub://country/{code}, iphub://country/{code}/rules/{format}, iphub://system/status, iphub://system/plugins, iphub://docs/llms.txt',
+        },
+        {
+          '@type': 'PropertyValue',
+          name: 'Registered MCP Prompts (7)',
+          value: 'country_ip_list_fa, generate_country_firewall_config, ddos_geoip_mitigation_guide, investigate_network_resource, batch_ip_security_triage, asn_bgp_peering_analysis, subnet_planning_assistant',
+        },
+      ],
+      distribution: [
+        {
+          '@type': 'DataDownload',
+          encodingFormat: 'application/json',
+          name: 'IP-Hub Streamable HTTP MCP Endpoint',
+          contentUrl: canonicalEndpoint,
+        },
+        {
+          '@type': 'DataDownload',
+          encodingFormat: 'text/markdown',
+          name: 'IP-Hub MCP Markdown Documentation',
+          contentUrl: `${pageUrl}.md`,
+        },
+      ],
+    });
+
     return () => {
       const existing = document.getElementById(scriptId);
       if (existing) existing.remove();
+      removePageDatasetSchema();
     };
   }, [language, mp, t.brand]);
 

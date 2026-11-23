@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -175,7 +176,7 @@ func (h *Handler) generateMarkdownForRoute(c fiber.Ctx) string {
 	switch first {
 	case "country":
 		if rest != "" {
-			return h.renderCountryMarkdown(rest, lang)
+			return h.renderCountryMarkdown(c, rest, lang)
 		}
 		return h.renderHomeMarkdown(lang)
 
@@ -374,12 +375,52 @@ Please check that the ASN format is valid (e.g. `+"`AS13335`"+` or `+"`13335`"+`
 		var prefixList strings.Builder
 		count := len(record.Prefixes)
 		displayLimit := min(count, 25)
+		samplePrefixes := make([]string, 0, min(count, 10))
 		for i := range displayLimit {
 			fmt.Fprintf(&prefixList, "- `%s`\n", record.Prefixes[i])
+			if i < 10 {
+				samplePrefixes = append(samplePrefixes, record.Prefixes[i])
+			}
 		}
 		if count > displayLimit {
 			fmt.Fprintf(&prefixList, "- *... and %d more prefixes*\n", count-displayLimit)
 		}
+
+		datasetSchema := map[string]any{
+			"@context":            "https://schema.org",
+			"@type":               "Dataset",
+			"@id":                 fmt.Sprintf("https://ip-hub.ir/lookup/%s#dataset", url.PathEscape(record.Asn)),
+			"name":                fmt.Sprintf("%s (%s) BGP Routing & RIPE WHOIS Dataset", record.Asn, record.Holder),
+			"description":         fmt.Sprintf("Original RIPE WHOIS registration and BGP routing dataset for Autonomous System %s (%s, %s) announcing %d prefixes.", record.Asn, record.Holder, record.CountryCode, record.AnnouncedPrefixesCount),
+			"url":                 fmt.Sprintf("https://ip-hub.ir/lookup/%s", url.PathEscape(record.Asn)),
+			"license":             "https://opensource.org/licenses/MIT",
+			"isAccessibleForFree": true,
+			"creator": map[string]any{
+				"@type": "Organization",
+				"@id":   "https://ip-hub.ir/#organization",
+				"name":  "IP-Hub",
+				"url":   "https://ip-hub.ir/",
+			},
+			"variableMeasured": []map[string]any{
+				{"@type": "PropertyValue", "name": "ASN", "value": record.Asn},
+				{"@type": "PropertyValue", "name": "Holder", "value": record.Holder},
+				{"@type": "PropertyValue", "name": "Organization", "value": record.OrgName},
+				{"@type": "PropertyValue", "name": "Country", "value": record.CountryCode},
+				{"@type": "PropertyValue", "name": "BGP Status", "value": statusStr},
+				{"@type": "PropertyValue", "name": "Announced Prefixes Count", "value": record.AnnouncedPrefixesCount},
+				{"@type": "PropertyValue", "name": "Abuse Contact", "value": abuseEmail},
+				{"@type": "PropertyValue", "name": "Sample Prefixes", "value": strings.Join(samplePrefixes, ", ")},
+			},
+			"distribution": []map[string]any{
+				{
+					"@type":          "DataDownload",
+					"encodingFormat": "application/json",
+					"name":           fmt.Sprintf("%s WHOIS JSON API", record.Asn),
+					"contentUrl":     "https://ip-hub.ir/api/whois/lookup",
+				},
+			},
+		}
+		schemaBytes, _ := json.MarshalIndent(datasetSchema, "", "  ")
 
 		return fmt.Sprintf(`---
 title: %s (%s) - Autonomous System Routing & WHOIS - IP-Hub
@@ -408,19 +449,14 @@ description: BGP announcement state, announced prefix count, registered organiza
 
 `+"```text\n%s\n```"+`
 
-`+"```json\n"+`{
-  "@context": "https://schema.org",
-  "@type": "Dataset",
-  "name": "%s",
-  "description": "BGP routing and WHOIS data for %s"
-}`+"\n```",
+`+"```json\n%s\n```",
 			record.Asn, record.Holder, record.Asn,
 			record.Asn,
 			record.Asn, record.Holder, record.OrgName, record.Country, record.CountryCode,
 			statusStr, record.AnnouncedPrefixesCount, abuseEmail,
 			count, prefixList.String(),
 			record.RawWhoisText,
-			record.Asn, record.Asn,
+			string(schemaBytes),
 		)
 	}
 
@@ -472,6 +508,43 @@ Verify that the target is a valid IPv4, IPv6, or CIDR address.
 `, record.Subnet.CIDR, record.Subnet.NetworkAddress, record.Subnet.Netmask, record.Subnet.WildcardMask, record.Subnet.FirstUsableIP, record.Subnet.LastUsableIP, record.Subnet.UsableHosts)
 	}
 
+	ipDatasetSchema := map[string]any{
+		"@context":            "https://schema.org",
+		"@type":               "Dataset",
+		"@id":                 fmt.Sprintf("https://ip-hub.ir/lookup/%s#dataset", url.PathEscape(record.Query)),
+		"name":                fmt.Sprintf("IP Intelligence Dataset for %s (%s)", record.Query, record.Netname),
+		"description":         fmt.Sprintf("Original RIPE WHOIS allocation (%s / %s), organization (%s, %s), BGP origin routing (%s), and abuse contact dataset for %s.", record.CIDR, record.Range, record.OrgName, record.CountryCode, originAsn, record.Query),
+		"url":                 fmt.Sprintf("https://ip-hub.ir/lookup/%s", url.PathEscape(record.Query)),
+		"license":             "https://opensource.org/licenses/MIT",
+		"isAccessibleForFree": true,
+		"creator": map[string]any{
+			"@type": "Organization",
+			"@id":   "https://ip-hub.ir/#organization",
+			"name":  "IP-Hub",
+			"url":   "https://ip-hub.ir/",
+		},
+		"variableMeasured": []map[string]any{
+			{"@type": "PropertyValue", "name": "Query Target", "value": record.Query},
+			{"@type": "PropertyValue", "name": "Network Name", "value": record.Netname},
+			{"@type": "PropertyValue", "name": "Allocated CIDR", "value": record.CIDR},
+			{"@type": "PropertyValue", "name": "Allocated Range", "value": record.Range},
+			{"@type": "PropertyValue", "name": "Organization", "value": record.OrgName},
+			{"@type": "PropertyValue", "name": "Country", "value": record.CountryCode},
+			{"@type": "PropertyValue", "name": "Origin ASN", "value": originAsn},
+			{"@type": "PropertyValue", "name": "Routing State", "value": routedStr},
+			{"@type": "PropertyValue", "name": "Abuse Contact", "value": abuseEmail},
+		},
+		"distribution": []map[string]any{
+			{
+				"@type":          "DataDownload",
+				"encodingFormat": "application/json",
+				"name":           fmt.Sprintf("%s WHOIS JSON API", record.Query),
+				"contentUrl":     "https://ip-hub.ir/api/whois/lookup",
+			},
+		},
+	}
+	ipSchemaBytes, _ := json.MarshalIndent(ipDatasetSchema, "", "  ")
+
 	return fmt.Sprintf(`---
 title: WHOIS & BGP Intelligence: %s - IP-Hub
 description: Real-time network intelligence, BGP origin routing, RIPE allocation records, and abuse contacts for %s.
@@ -511,12 +584,7 @@ description: Real-time network intelligence, BGP origin routing, RIPE allocation
 
 `+"```text\n%s\n```"+`
 
-`+"```json\n"+`{
-  "@context": "https://schema.org",
-  "@type": "Dataset",
-  "name": "IP Intelligence for %s",
-  "description": "Network registration, BGP routing, and WHOIS records for %s"
-}`+"\n```",
+`+"```json\n%s\n```",
 		record.Query, record.Query,
 		record.Query,
 		record.Query, record.Netname, record.CIDR, record.Range, record.OrgName,
@@ -525,7 +593,7 @@ description: Real-time network intelligence, BGP origin routing, RIPE allocation
 		abuseEmail, record.AbuseContact.OrgName,
 		subnetMd,
 		record.RawWhoisText,
-		record.Query, record.Query,
+		string(ipSchemaBytes),
 	)
 }
 
@@ -554,7 +622,7 @@ Use this tool to inspect any IPv4 address, IPv6 address, CIDR prefix, or Autonom
 ` + "```\n"
 }
 
-func (h *Handler) renderCountryMarkdown(rawCode, lang string) string {
+func (h *Handler) renderCountryMarkdown(c fiber.Ctx, rawCode, lang string) string {
 	code := strings.ToUpper(strings.TrimSpace(rawCode))
 	if before, ok := strings.CutSuffix(code, ".MD"); ok {
 		code = before
@@ -575,10 +643,41 @@ Please use a valid ISO 3166-1 alpha-2 code (e.g. `+"`/country/IR`"+`, `+"`/count
 `, code, code, code, code, err)
 	}
 
+	reqFormat := strings.ToLower(strings.TrimSpace(c.Query("format")))
+	if reqFormat == "" {
+		reqFormat = "mikrotik"
+	}
+	reqVersion := strings.ToLower(strings.TrimSpace(c.Query("version")))
+	if reqVersion == "" {
+		reqVersion = "any"
+	}
+	reqAccess := strings.ToLower(strings.TrimSpace(c.Query("access")))
+	if reqAccess != "deny" {
+		reqAccess = "allow"
+	}
+	reqListName := strings.TrimSpace(c.Query("listName"))
+	if reqListName == "" {
+		reqListName = res.CountryCode
+	}
+
+	formattedRes := h.svc.FormatCountry(res, reqFormat, reqVersion, reqAccess, reqListName)
+	ruleCount := 0
+	filename := fmt.Sprintf("%s_%s.txt", strings.ToLower(res.CountryCode), reqFormat)
+	if formattedRes != nil {
+		ruleCount = formattedRes.RuleCount
+		if formattedRes.Filename != "" {
+			filename = formattedRes.Filename
+		}
+	}
+
 	var ipv4Sample strings.Builder
 	v4Display := min(len(res.IPv4), 20)
+	v4SampleSlice := make([]string, 0, min(len(res.IPv4), 10))
 	for i := range v4Display {
 		fmt.Fprintf(&ipv4Sample, "- `%s`\n", res.IPv4[i])
+		if i < 10 {
+			v4SampleSlice = append(v4SampleSlice, res.IPv4[i])
+		}
 	}
 	if len(res.IPv4) > v4Display {
 		fmt.Fprintf(&ipv4Sample, "- *... and %d more IPv4 prefixes*\n", len(res.IPv4)-v4Display)
@@ -586,11 +685,20 @@ Please use a valid ISO 3166-1 alpha-2 code (e.g. `+"`/country/IR`"+`, `+"`/count
 
 	var ipv6Sample strings.Builder
 	v6Display := min(len(res.IPv6), 20)
+	v6SampleSlice := make([]string, 0, min(len(res.IPv6), 5))
 	for i := range v6Display {
 		fmt.Fprintf(&ipv6Sample, "- `%s`\n", res.IPv6[i])
+		if i < 5 {
+			v6SampleSlice = append(v6SampleSlice, res.IPv6[i])
+		}
 	}
 	if len(res.IPv6) > v6Display {
 		fmt.Fprintf(&ipv6Sample, "- *... and %d more IPv6 prefixes*\n", len(res.IPv6)-v6Display)
+	}
+
+	asnSampleSlice := make([]string, 0, min(len(res.ASNs), 10))
+	for i := range min(len(res.ASNs), 10) {
+		asnSampleSlice = append(asnSampleSlice, fmt.Sprintf("AS%d", res.ASNs[i]))
 	}
 
 	mikrotikExample := fmt.Sprintf(`/ip firewall address-list
@@ -607,6 +715,66 @@ add list=COUNTRY_%s address=%s comment="%s delegated range"`,
 
 	ipsetExample := fmt.Sprintf(`ipset create country_%s hash:net
 ipset add country_%s %s`, strings.ToLower(code), strings.ToLower(code), getFirstPrefixOrFallback(res.IPv4, "1.0.0.0/24"))
+
+	dlURL := fmt.Sprintf("https://ip-hub.ir/dl?country=%s&format=%s&version=%s&access=%s&listName=%s",
+		url.QueryEscape(res.CountryCode),
+		url.QueryEscape(reqFormat),
+		url.QueryEscape(reqVersion),
+		url.QueryEscape(reqAccess),
+		url.QueryEscape(reqListName),
+	)
+
+	countryDatasetSchema := map[string]any{
+		"@context":            "https://schema.org",
+		"@type":               "Dataset",
+		"@id":                 fmt.Sprintf("https://ip-hub.ir/country/%s#dataset-%s-%s-%s", res.CountryCode, reqFormat, reqVersion, reqAccess),
+		"name":                fmt.Sprintf("%s (%s) IP List formatted for %s (%s, %s)", res.CountryName, res.CountryCode, reqFormat, strings.ToUpper(reqVersion), strings.ToUpper(reqAccess)),
+		"description":         fmt.Sprintf("Original RIR-delegated IP dataset for %s (%s) containing %d IPv4 prefixes, %d IPv6 prefixes, and %d ASNs, formatted with parameters: format=%s, version=%s, access=%s, listName=%s (%d generated rules).", res.CountryName, res.CountryCode, res.IPv4Count, res.IPv6Count, res.AsnCount, reqFormat, reqVersion, reqAccess, reqListName, ruleCount),
+		"url":                 fmt.Sprintf("https://ip-hub.ir/country/%s", res.CountryCode),
+		"license":             "https://opensource.org/licenses/MIT",
+		"isAccessibleForFree": true,
+		"spatialCoverage": map[string]any{
+			"@type":      "Country",
+			"name":       res.CountryName,
+			"identifier": res.CountryCode,
+		},
+		"creator": map[string]any{
+			"@type": "Organization",
+			"@id":   "https://ip-hub.ir/#organization",
+			"name":  "IP-Hub",
+			"url":   "https://ip-hub.ir/",
+		},
+		"variableMeasured": []map[string]any{
+			{"@type": "PropertyValue", "name": "Country Code", "value": res.CountryCode},
+			{"@type": "PropertyValue", "name": "Format Parameter", "value": reqFormat},
+			{"@type": "PropertyValue", "name": "IP Version Parameter", "value": reqVersion},
+			{"@type": "PropertyValue", "name": "Access Policy Parameter", "value": reqAccess},
+			{"@type": "PropertyValue", "name": "List Name Parameter", "value": reqListName},
+			{"@type": "PropertyValue", "name": "Generated Firewall Rule Count", "value": ruleCount},
+			{"@type": "PropertyValue", "name": "Delegated IPv4 CIDR Count", "value": res.IPv4Count},
+			{"@type": "PropertyValue", "name": "Delegated IPv6 CIDR Count", "value": res.IPv6Count},
+			{"@type": "PropertyValue", "name": "Origin ASN Count", "value": res.AsnCount},
+			{"@type": "PropertyValue", "name": "Estimated IPv4 Addresses", "value": res.TotalEstimatedIPv4Addresses},
+			{"@type": "PropertyValue", "name": "Sample IPv4 CIDR Prefixes", "value": strings.Join(v4SampleSlice, ", ")},
+			{"@type": "PropertyValue", "name": "Sample IPv6 CIDR Prefixes", "value": strings.Join(v6SampleSlice, ", ")},
+			{"@type": "PropertyValue", "name": "Sample Origin ASNs", "value": strings.Join(asnSampleSlice, ", ")},
+		},
+		"distribution": []map[string]any{
+			{
+				"@type":          "DataDownload",
+				"encodingFormat": "text/plain",
+				"name":           filename,
+				"contentUrl":     dlURL,
+			},
+			{
+				"@type":          "DataDownload",
+				"encodingFormat": "application/json",
+				"name":           fmt.Sprintf("%s (%s) Raw JSON Resource", res.CountryName, res.CountryCode),
+				"contentUrl":     fmt.Sprintf("https://ip-hub.ir/dl?country=%s&format=json&version=%s&access=%s", url.QueryEscape(res.CountryCode), url.QueryEscape(reqVersion), url.QueryEscape(reqAccess)),
+			},
+		},
+	}
+	countrySchemaBytes, _ := json.MarshalIndent(countryDatasetSchema, "", "  ")
 
 	return fmt.Sprintf(`---
 title: %s (%s) IP Delegations & Firewall Rules - IP-Hub
@@ -658,12 +826,7 @@ You can fetch the complete list of prefixes programmatically via JSON:
 `+"```bash\n"+`curl -X POST https://ip-hub.ir/api/whois/country \
   -H "Content-Type: application/json" \
   -d '{"code": "%s"}'
-`+"```\n\n"+` `+"```json\n"+`{
-  "@context": "https://schema.org",
-  "@type": "Dataset",
-  "name": "%s IP Delegations",
-  "description": "IPv4 and IPv6 delegated network blocks for %s (%s)"
-}`+"\n```",
+`+"```\n\n```json\n%s\n```",
 		res.CountryName, res.CountryCode, res.CountryName, res.CountryCode,
 		res.CountryName, res.CountryCode, res.CountryName, res.CountryCode,
 		res.CountryCode, res.CountryName, res.IPv4Count, res.IPv6Count, res.AsnCount, res.TotalEstimatedIPv4Addresses, res.QueryTime,
@@ -671,7 +834,7 @@ You can fetch the complete list of prefixes programmatically via JSON:
 		res.IPv4Count, ipv4Sample.String(),
 		res.IPv6Count, ipv6Sample.String(),
 		res.CountryCode,
-		res.CountryName, res.CountryName, res.CountryCode,
+		string(countrySchemaBytes),
 	)
 }
 
@@ -753,6 +916,44 @@ func (h *Handler) renderSubnetCalcWithQueryMarkdown(query, lang string) string {
 		return h.renderSubnetCalcGuideMarkdown(lang)
 	}
 
+	subnetDatasetSchema := map[string]any{
+		"@context":            "https://schema.org",
+		"@type":               "Dataset",
+		"@id":                 fmt.Sprintf("https://ip-hub.ir/subnet-calc/%s#dataset", url.PathEscape(res.CIDR)),
+		"name":                fmt.Sprintf("CIDR Subnet Calculation Dataset for %s (IPv%d)", res.CIDR, res.IPVersion),
+		"description":         fmt.Sprintf("Original CIDR subnet breakdown dataset for %s: Network Address %s, Netmask %s, Wildcard Mask %s, Broadcast %s, Usable Range %s to %s (%s usable hosts).", res.CIDR, res.NetworkAddress, res.Netmask, res.WildcardMask, res.BroadcastAddress, res.FirstUsableIP, res.LastUsableIP, res.UsableHosts),
+		"url":                 fmt.Sprintf("https://ip-hub.ir/subnet-calc/%s", url.PathEscape(res.CIDR)),
+		"license":             "https://opensource.org/licenses/MIT",
+		"isAccessibleForFree": true,
+		"creator": map[string]any{
+			"@type": "Organization",
+			"@id":   "https://ip-hub.ir/#organization",
+			"name":  "IP-Hub",
+			"url":   "https://ip-hub.ir/",
+		},
+		"variableMeasured": []map[string]any{
+			{"@type": "PropertyValue", "name": "CIDR Notation", "value": res.CIDR},
+			{"@type": "PropertyValue", "name": "IP Version", "value": fmt.Sprintf("IPv%d", res.IPVersion)},
+			{"@type": "PropertyValue", "name": "Prefix Length", "value": fmt.Sprintf("/%d", res.PrefixLength)},
+			{"@type": "PropertyValue", "name": "Network Address", "value": res.NetworkAddress},
+			{"@type": "PropertyValue", "name": "Subnet Mask", "value": res.Netmask},
+			{"@type": "PropertyValue", "name": "Wildcard Mask", "value": res.WildcardMask},
+			{"@type": "PropertyValue", "name": "Broadcast Address", "value": res.BroadcastAddress},
+			{"@type": "PropertyValue", "name": "Usable Host Range", "value": fmt.Sprintf("%s - %s", res.FirstUsableIP, res.LastUsableIP)},
+			{"@type": "PropertyValue", "name": "Total Usable Hosts", "value": res.UsableHosts},
+			{"@type": "PropertyValue", "name": "Total Address Space", "value": res.TotalHosts},
+		},
+		"distribution": []map[string]any{
+			{
+				"@type":          "DataDownload",
+				"encodingFormat": "application/json",
+				"name":           fmt.Sprintf("%s Subnet JSON Calculation", res.CIDR),
+				"contentUrl":     fmt.Sprintf("https://ip-hub.ir/api/whois/subnet?ip=%s", url.QueryEscape(res.CIDR)),
+			},
+		},
+	}
+	subnetSchemaBytes, _ := json.MarshalIndent(subnetDatasetSchema, "", "  ")
+
 	return fmt.Sprintf(`---
 title: Subnet Calculation: %s - IP-Hub
 description: Detailed CIDR calculation breakdown, usable host range, netmask, and wildcard mask for %s.
@@ -783,7 +984,7 @@ description: Detailed CIDR calculation breakdown, usable host range, netmask, an
 ## REST API Query
 
 `+"```bash\n"+`curl "https://ip-hub.ir/api/whois/subnet?ip=%s"
-`+"```\n",
+`+"```\n\n```json\n%s\n```\n",
 		res.CIDR, res.CIDR,
 		res.CIDR,
 		res.CIDR, res.IPVersion, res.PrefixLength, res.NetworkAddress,
@@ -791,6 +992,7 @@ description: Detailed CIDR calculation breakdown, usable host range, netmask, an
 		res.FirstUsableIP, res.LastUsableIP, res.UsableHosts, res.TotalHosts,
 		res.BinaryIP,
 		url.QueryEscape(res.CIDR),
+		string(subnetSchemaBytes),
 	)
 }
 

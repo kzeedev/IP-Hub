@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Input, Button, Table, Space, Typography, Tag, Alert, theme } from 'antd';
 import {
   UnorderedListOutlined,
@@ -11,6 +11,7 @@ import { BatchLookupItemResult } from '../types';
 import { downloadText } from '../utils/helpers';
 import { getCountryName } from '../utils/countries';
 import { getRouteUrl } from '../utils/router';
+import { upsertPageDatasetSchema, removePageDatasetSchema } from '../utils/datasetSchema';
 import { FlagIcon } from './FlagIcon';
 import { useLanguage } from '../i18n/LanguageContext';
 
@@ -35,6 +36,144 @@ export const BatchInspector: React.FC<BatchInspectorProps> = ({ onInspectSingle 
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<BatchLookupItemResult[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const langPrefix = language === 'fa' ? '/fa' : '';
+    const inLang = language === 'fa' ? 'fa-IR' : 'en-US';
+    const pageUrl = `https://ip-hub.ir${langPrefix}/batch-inspector`;
+    const queuedLines = inputText
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    if (results.length > 0) {
+      const successCount = results.filter((r) => r.status === 'success').length;
+      const uniqueCountries = Array.from(new Set(results.map((r) => r.countryCode).filter(Boolean)));
+      const uniqueAsns = Array.from(new Set(results.map((r) => r.originAsn).filter(Boolean)));
+      const resultSummary = results
+        .slice(0, 15)
+        .map((r) => `${r.query} (${r.netname || 'Unknown'}, ${r.countryCode || '-'}, ${r.originAsn || 'Unrouted'})`)
+        .join('; ');
+
+      upsertPageDatasetSchema({
+        '@context': 'https://schema.org',
+        '@type': 'Dataset',
+        '@id': `${pageUrl}#dataset`,
+        name:
+          language === 'fa'
+            ? `نتایج بررسی دسته‌ای هویز و BGP (${results.length} هدف شبکه)`
+            : `Batch WHOIS & BGP Inspection Dataset (${results.length} Audited Targets)`,
+        description:
+          language === 'fa'
+            ? `مجموعه داده نتایج استعلام هم‌زمان هویز RIPE و روتینگ BGP برای ${results.length} آدرس IP و پیشوند شبکه (${successCount} موفق در ${uniqueCountries.length} کشور و ${uniqueAsns.length} سیستم مستقل).`
+            : `Original batch RIPE WHOIS and BGP routing inspection dataset covering ${results.length} network targets (${successCount} resolved across ${uniqueCountries.length} countries and ${uniqueAsns.length} origin ASNs).`,
+        url: pageUrl,
+        inLanguage: inLang,
+        license: 'https://opensource.org/licenses/MIT',
+        isAccessibleForFree: true,
+        creator: {
+          '@type': 'Organization',
+          '@id': 'https://ip-hub.ir/#organization',
+          name: 'IP-Hub',
+          url: 'https://ip-hub.ir/',
+        },
+        keywords: results.slice(0, 10).map((r) => r.query),
+        variableMeasured: [
+          {
+            '@type': 'PropertyValue',
+            name: 'Audited Targets Count',
+            value: results.length,
+          },
+          {
+            '@type': 'PropertyValue',
+            name: 'Resolved Targets Count',
+            value: successCount,
+          },
+          {
+            '@type': 'PropertyValue',
+            name: 'Distinct Countries',
+            value: uniqueCountries.join(', ') || 'None',
+          },
+          {
+            '@type': 'PropertyValue',
+            name: 'Distinct Origin ASNs',
+            value: uniqueAsns.join(', ') || 'None',
+          },
+          {
+            '@type': 'PropertyValue',
+            name: 'Audited Records Sample',
+            value: resultSummary,
+          },
+        ],
+        distribution: [
+          {
+            '@type': 'DataDownload',
+            encodingFormat: 'text/csv',
+            name: 'ripe_batch_whois_results.csv',
+            contentUrl: pageUrl,
+          },
+          {
+            '@type': 'DataDownload',
+            encodingFormat: 'application/json',
+            name: 'ripe_batch_whois_results.json',
+            contentUrl: 'https://ip-hub.ir/api/whois/batch',
+          },
+        ],
+      });
+    } else {
+      upsertPageDatasetSchema({
+        '@context': 'https://schema.org',
+        '@type': 'Dataset',
+        '@id': `${pageUrl}#dataset`,
+        name:
+          language === 'fa'
+            ? `مجموعه هدف‌های بررسی دسته‌ای هویز (${queuedLines.length} هدف در صف)`
+            : `Batch WHOIS & BGP Queued Targets Dataset (${queuedLines.length} Targets)`,
+        description:
+          language === 'fa'
+            ? `فهرست ${queuedLines.length} آدرس IP و پیشوند شبکه آماده استعلام دسته‌ای هویز RIPE و مسیریابی BGP.`
+            : `Batch inspection queue containing ${queuedLines.length} IPv4/IPv6 targets ready for concurrent RIPE WHOIS, BGP origin ASN, and abuse mailbox resolution.`,
+        url: pageUrl,
+        inLanguage: inLang,
+        license: 'https://opensource.org/licenses/MIT',
+        isAccessibleForFree: true,
+        creator: {
+          '@type': 'Organization',
+          '@id': 'https://ip-hub.ir/#organization',
+          name: 'IP-Hub',
+          url: 'https://ip-hub.ir/',
+        },
+        variableMeasured: [
+          {
+            '@type': 'PropertyValue',
+            name: 'Queued Targets Count',
+            value: queuedLines.length,
+          },
+          ...(queuedLines.length > 0
+            ? [
+                {
+                  '@type': 'PropertyValue',
+                  name: 'Queued Targets',
+                  value: queuedLines.slice(0, 15).join(', '),
+                },
+              ]
+            : []),
+        ],
+        distribution: [
+          {
+            '@type': 'DataDownload',
+            encodingFormat: 'application/json',
+            name: 'Batch WHOIS REST API',
+            contentUrl: 'https://ip-hub.ir/api/whois/batch',
+          },
+        ],
+      });
+    }
+
+    return () => {
+      removePageDatasetSchema();
+    };
+  }, [results, inputText, language]);
 
   const handleRunBatch = async () => {
     const lines = inputText

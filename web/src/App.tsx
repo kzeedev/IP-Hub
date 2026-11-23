@@ -30,6 +30,7 @@ import { SummaryCards } from './components/SummaryCards';
 import { OverviewTab } from './components/OverviewTab';
 import { useLanguage } from './i18n/LanguageContext';
 import { parseRoute, navigateRoute, updateDocumentSeoMeta } from './utils/router';
+import { upsertPageDatasetSchema, removePageDatasetSchema } from './utils/datasetSchema';
 
 // Code-split Views for Core Web Vitals LCP & Bundle Size
 const CountryIpExplorer = lazy(() => import('./components/CountryIpExplorer').then(m => ({ default: m.CountryIpExplorer || m.default })));
@@ -344,6 +345,250 @@ export default function App() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [query, language]);
+
+  // Inject page-specific Schema.org Dataset JSON-LD for Lookup (IP/CIDR or ASN) based on live WHOIS/BGP record content
+  useEffect(() => {
+    if (activeView !== 'lookup') {
+      return;
+    }
+
+    const langPrefix = language === 'fa' ? '/fa' : '';
+    const inLang = language === 'fa' ? 'fa-IR' : 'en-US';
+
+    if (asnRecord) {
+      const pageUrl = `https://ip-hub.ir${langPrefix}/lookup/${encodeURIComponent(asnRecord.asn)}`;
+      const samplePrefixes = (asnRecord.prefixes || []).slice(0, 15);
+      upsertPageDatasetSchema({
+        '@context': 'https://schema.org',
+        '@type': 'Dataset',
+        '@id': `${pageUrl}#dataset`,
+        name:
+          language === 'fa'
+            ? `داده‌های مسیریابی BGP و هویز RIPE برای ${asnRecord.asn} (${asnRecord.holder})`
+            : `${asnRecord.asn} (${asnRecord.holder}) BGP Routing & RIPE WHOIS Dataset`,
+        description:
+          language === 'fa'
+            ? `مجموعه داده اصلی هویز و وضعیت اعلان BGP برای سیستم مستقل ${asnRecord.asn} متعلق به ${asnRecord.orgName || asnRecord.holder} (${asnRecord.countryCode}) شامل ${asnRecord.announcedPrefixesCount} پیشوند فعال.`
+            : `Original RIPE WHOIS registration and BGP routing dataset for Autonomous System ${asnRecord.asn} (${asnRecord.orgName || asnRecord.holder}, ${asnRecord.countryCode}) announcing ${asnRecord.announcedPrefixesCount} prefixes.`,
+        url: pageUrl,
+        inLanguage: inLang,
+        license: 'https://opensource.org/licenses/MIT',
+        isAccessibleForFree: true,
+        ...(asnRecord.queriedAt ? { dateModified: asnRecord.queriedAt } : {}),
+        ...(asnRecord.country
+          ? {
+              spatialCoverage: {
+                '@type': 'Country',
+                name: asnRecord.country,
+                identifier: asnRecord.countryCode,
+              },
+            }
+          : {}),
+        creator: {
+          '@type': 'Organization',
+          '@id': 'https://ip-hub.ir/#organization',
+          name: 'IP-Hub',
+          url: 'https://ip-hub.ir/',
+        },
+        keywords: [
+          asnRecord.asn,
+          asnRecord.holder,
+          ...(asnRecord.orgName ? [asnRecord.orgName] : []),
+          asnRecord.countryCode,
+          ...samplePrefixes.slice(0, 5),
+        ].filter(Boolean),
+        variableMeasured: [
+          {
+            '@type': 'PropertyValue',
+            name: 'Autonomous System Number (ASN)',
+            value: asnRecord.asn,
+          },
+          {
+            '@type': 'PropertyValue',
+            name: 'Holder / Organization',
+            value: asnRecord.orgName || asnRecord.holder,
+          },
+          {
+            '@type': 'PropertyValue',
+            name: 'Country Code',
+            value: asnRecord.countryCode || 'Unknown',
+          },
+          {
+            '@type': 'PropertyValue',
+            name: 'BGP Announced Status',
+            value: asnRecord.routingStatus?.announced ? 'Announced' : 'Unannounced',
+          },
+          {
+            '@type': 'PropertyValue',
+            name: 'Announced Prefixes Count',
+            value: asnRecord.announcedPrefixesCount,
+          },
+          ...(asnRecord.abuseContact?.email
+            ? [
+                {
+                  '@type': 'PropertyValue',
+                  name: 'Abuse Contact Email',
+                  value: asnRecord.abuseContact.email,
+                },
+              ]
+            : []),
+          ...(samplePrefixes.length > 0
+            ? [
+                {
+                  '@type': 'PropertyValue',
+                  name: 'Announced CIDR Prefixes Sample',
+                  value: samplePrefixes.join(', '),
+                },
+              ]
+            : []),
+        ],
+        distribution: [
+          {
+            '@type': 'DataDownload',
+            encodingFormat: 'application/json',
+            name: `${asnRecord.asn} WHOIS & BGP JSON API`,
+            contentUrl: 'https://ip-hub.ir/api/whois/lookup',
+          },
+          {
+            '@type': 'DataDownload',
+            encodingFormat: 'text/markdown',
+            name: `${asnRecord.asn} Markdown Intelligence Report`,
+            contentUrl: `https://ip-hub.ir${langPrefix}/lookup/${encodeURIComponent(asnRecord.asn)}.md`,
+          },
+        ],
+      });
+    } else if (currentRecord) {
+      const targetQuery = currentRecord.query || query;
+      const pageUrl = `https://ip-hub.ir${langPrefix}/lookup/${encodeURIComponent(targetQuery)}`;
+      upsertPageDatasetSchema({
+        '@context': 'https://schema.org',
+        '@type': 'Dataset',
+        '@id': `${pageUrl}#dataset`,
+        name:
+          language === 'fa'
+            ? `داده‌های هویز RIPE و مسیریابی BGP برای ${targetQuery} (${currentRecord.netname})`
+            : `RIPE WHOIS & BGP Routing Intelligence Dataset for ${targetQuery} (${currentRecord.netname})`,
+        description:
+          language === 'fa'
+            ? `مجموعه داده اصلی ثبت شبکه (${currentRecord.cidr} / ${currentRecord.range})، سازمان ${currentRecord.orgName || currentRecord.netname} (${currentRecord.countryCode}) و وضعیت روتینگ BGP (${currentRecord.routing.originAsn || 'Unrouted'}) برای ${targetQuery}.`
+            : `Original RIPE WHOIS allocation (${currentRecord.cidr} / ${currentRecord.range}), organization (${currentRecord.orgName || currentRecord.netname}, ${currentRecord.countryCode}), BGP origin routing (${currentRecord.routing.originAsn || 'Unrouted'}), and abuse contact dataset for ${targetQuery}.`,
+        url: pageUrl,
+        inLanguage: inLang,
+        license: 'https://opensource.org/licenses/MIT',
+        isAccessibleForFree: true,
+        ...(currentRecord.queriedAt ? { dateModified: currentRecord.queriedAt } : {}),
+        ...(currentRecord.country
+          ? {
+              spatialCoverage: {
+                '@type': 'Country',
+                name: currentRecord.country,
+                identifier: currentRecord.countryCode,
+              },
+            }
+          : {}),
+        creator: {
+          '@type': 'Organization',
+          '@id': 'https://ip-hub.ir/#organization',
+          name: 'IP-Hub',
+          url: 'https://ip-hub.ir/',
+        },
+        keywords: [
+          targetQuery,
+          currentRecord.netname,
+          currentRecord.cidr,
+          currentRecord.routing?.originAsn,
+          currentRecord.countryCode,
+        ].filter(Boolean),
+        variableMeasured: [
+          {
+            '@type': 'PropertyValue',
+            name: 'Queried Resource',
+            value: targetQuery,
+          },
+          {
+            '@type': 'PropertyValue',
+            name: 'Network Name (netname)',
+            value: currentRecord.netname,
+          },
+          {
+            '@type': 'PropertyValue',
+            name: 'Allocated CIDR Prefix',
+            value: currentRecord.cidr,
+          },
+          {
+            '@type': 'PropertyValue',
+            name: 'Allocated IP Range',
+            value: currentRecord.range,
+          },
+          {
+            '@type': 'PropertyValue',
+            name: 'Organization',
+            value: currentRecord.orgName || currentRecord.netname,
+          },
+          {
+            '@type': 'PropertyValue',
+            name: 'Country Code',
+            value: currentRecord.countryCode,
+          },
+          {
+            '@type': 'PropertyValue',
+            name: 'Allocation Status',
+            value: currentRecord.status,
+          },
+          {
+            '@type': 'PropertyValue',
+            name: 'BGP Origin ASN',
+            value: currentRecord.routing?.originAsn || 'Unannounced',
+          },
+          {
+            '@type': 'PropertyValue',
+            name: 'BGP Visibility Percentage',
+            value: `${currentRecord.routing?.bgpVisibilityPercentage ?? 0}% (${currentRecord.routing?.risPeersSeen ?? 0}/${currentRecord.routing?.totalRisPeers ?? 0} RIS peers)`,
+          },
+          ...(currentRecord.abuseContact?.email
+            ? [
+                {
+                  '@type': 'PropertyValue',
+                  name: 'Abuse Contact Email',
+                  value: currentRecord.abuseContact.email,
+                },
+              ]
+            : []),
+          ...(currentRecord.reverseDns
+            ? [
+                {
+                  '@type': 'PropertyValue',
+                  name: 'Reverse DNS (PTR)',
+                  value: currentRecord.reverseDns,
+                },
+              ]
+            : []),
+        ],
+        distribution: [
+          {
+            '@type': 'DataDownload',
+            encodingFormat: 'application/json',
+            name: `${targetQuery} WHOIS & BGP JSON API`,
+            contentUrl: 'https://ip-hub.ir/api/whois/lookup',
+          },
+          {
+            '@type': 'DataDownload',
+            encodingFormat: 'text/markdown',
+            name: `${targetQuery} Markdown Intelligence Report`,
+            contentUrl: `https://ip-hub.ir${langPrefix}/lookup/${encodeURIComponent(targetQuery)}.md`,
+          },
+        ],
+      });
+    } else {
+      removePageDatasetSchema();
+    }
+
+    return () => {
+      if (activeView === 'lookup') {
+        removePageDatasetSchema();
+      }
+    };
+  }, [activeView, currentRecord, asnRecord, query, language]);
 
   const tabItems = currentRecord
     ? [

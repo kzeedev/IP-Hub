@@ -122,7 +122,7 @@
         if (s.length > 0 && (s[0] === 'fa' || s[0] === 'en')) {
           s.shift();
         }
-        var valid = ['country', 'country-ips', 'batch-inspector', 'subnet-calc', 'source', 'issues', 'settings', 'lookup'];
+        var valid = ['country', 'country-ips', 'batch-inspector', 'subnet-calc', 'mcp', 'source', 'issues', 'settings', 'lookup'];
         var isInvalid = s.length > 0 && (
           valid.indexOf(s[0]) === -1 ||
           (s[0] === 'country' && s.length < 2) ||
@@ -239,39 +239,6 @@
         "creator": {
           "@id": "https://ip-hub.ir/#organization"
         }
-      },
-      {
-        "@context": "https://schema.org/",
-        "@type": "Dataset",
-        "@id": "https://ip-hub.ir/#dataset-country-ips",
-        "name": "Global Country IP Delegations & CIDR Prefixes",
-        "description": "Real-time aggregated IPv4 and IPv6 network prefix allocations and Autonomous System Numbers (ASNs) delegated across all ISO 3166-1 alpha-2 countries, formatted for edge firewall deployments and network security filtering.",
-        "url": "https://ip-hub.ir/country-ips",
-        "license": "https://opensource.org/licenses/MIT",
-        "isAccessibleForFree": true,
-        "creator": {
-          "@id": "https://ip-hub.ir/#organization"
-        },
-        "variableMeasured": [
-          "Delegated IPv4 CIDR blocks",
-          "Delegated IPv6 CIDR blocks",
-          "Country Autonomous System Numbers (ASNs)",
-          "Estimated total host addresses"
-        ],
-        "distribution": [
-          {
-            "@type": "DataDownload",
-            "encodingFormat": "text/plain",
-            "name": "Direct Download API",
-            "contentUrl": "https://ip-hub.ir/dl?country=IR&format=mikrotik&version=any&access=allow"
-          },
-          {
-            "@type": "DataDownload",
-            "encodingFormat": "application/json",
-            "name": "Country IP JSON API",
-            "contentUrl": "https://ip-hub.ir/api/whois/country"
-          }
-        ]
       },
       {
         "@context": "https://schema.org/",

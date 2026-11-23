@@ -49,6 +49,7 @@ import {
 import { ALL_COUNTRIES, POPULAR_COUNTRIES, getCountryDetails } from '../utils/countries';
 import { copyToClipboard, downloadText } from '../utils/helpers';
 import { getRouteUrl } from '../utils/router';
+import { upsertPageDatasetSchema, removePageDatasetSchema } from '../utils/datasetSchema';
 import { useLanguage } from '../i18n/LanguageContext';
 import { FlagIcon } from './FlagIcon';
 
@@ -291,52 +292,246 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
     }
   }, [selectedCountry]);
 
-  // Inject dynamic Schema.org Dataset JSON-LD for AI Search & Answer Engines (AEO/GEO)
+  // Inject dynamic Schema.org Dataset JSON-LD based on original page content & selected formatting parameters
   useEffect(() => {
-    if (!data) return;
-    const scriptId = 'country-ip-dataset-schema';
-    let script = document.getElementById(scriptId) as HTMLScriptElement | null;
-    if (!script) {
-      script = document.createElement('script');
-      script.id = scriptId;
-      script.type = 'application/ld+json';
-      document.head.appendChild(script);
+    const langPrefix = language === 'fa' ? '/fa' : '';
+    const inLang = language === 'fa' ? 'fa-IR' : 'en-US';
+
+    if (!data) {
+      const directoryUrl = `https://ip-hub.ir${langPrefix}/country-ips`;
+      upsertPageDatasetSchema({
+        '@context': 'https://schema.org',
+        '@type': 'Dataset',
+        '@id': `${directoryUrl}#dataset`,
+        name:
+          language === 'fa'
+            ? 'دایرکتوری رنج‌های IP و پیشوندهای CIDR کشورهای جهان'
+            : 'Global Country IP Delegations & CIDR Prefix Directory',
+        description:
+          language === 'fa'
+            ? `بانک اطلاعاتی رنج‌های آی‌پی IPv4، IPv6 و شماره‌های ASN تفویض‌شده به ${ALL_COUNTRIES.length} کشور با قابلیت تولید قوانین فایروال.`
+            : `Directory of official Regional Internet Registry (RIR) delegated IPv4/IPv6 CIDR prefixes and Autonomous System Numbers (ASNs) across ${ALL_COUNTRIES.length} ISO 3166-1 alpha-2 countries.`,
+        url: directoryUrl,
+        inLanguage: inLang,
+        license: 'https://opensource.org/licenses/MIT',
+        isAccessibleForFree: true,
+        creator: {
+          '@type': 'Organization',
+          '@id': 'https://ip-hub.ir/#organization',
+          name: 'IP-Hub',
+          url: 'https://ip-hub.ir/',
+        },
+        keywords: POPULAR_COUNTRIES.map((c) => `${c.name} (${c.code}) IP List`),
+        variableMeasured: [
+          {
+            '@type': 'PropertyValue',
+            name: 'Supported Countries',
+            value: ALL_COUNTRIES.length,
+          },
+          {
+            '@type': 'PropertyValue',
+            name: 'Supported Firewall Formats',
+            value: (formats.length > 0 ? formats : ['mikrotik', 'cisco', 'freebsd-pf', 'ipset', 'htaccess', 'json']).join(', '),
+          },
+        ],
+        distribution: [
+          {
+            '@type': 'DataDownload',
+            encodingFormat: 'application/json',
+            name: 'Country IP Resource REST API',
+            contentUrl: 'https://ip-hub.ir/api/whois/country',
+          },
+        ],
+      });
+      return () => {
+        removePageDatasetSchema();
+      };
     }
-    const schemaData = {
+
+    const codeUpper = data.countryCode.toUpperCase();
+    const localizedCountry = getCountryDetails(codeUpper, language)?.name || data.countryName;
+    const activeFormat = format || 'mikrotik';
+    const formatLabel =
+      (t.countryExplorer.formats as Record<string, string>)?.[activeFormat] ||
+      (activeFormat === 'freebsd-pf' ? (t.countryExplorer.formats as Record<string, string>)?.pf : null) ||
+      pluginsList.find((p) => p.id === activeFormat)?.name ||
+      activeFormat;
+    const activeListName = customListName || codeUpper;
+    const pageUrl = `https://ip-hub.ir${langPrefix}/country/${codeUpper}`;
+    const resolvedDlPath = downloadUrl || `/dl?country=${codeUpper}&format=${activeFormat}&version=${ipVersion}&access=${accessType}`;
+    const encodingFormat = activeFormat === 'json' ? 'application/json' : 'text/plain';
+
+    const sampleIpv4 = (data.ipv4 || []).slice(0, 10);
+    const sampleIpv6 = (data.ipv6 || []).slice(0, 5);
+    const sampleAsns = (data.asns || []).slice(0, 10).map((n) => `AS${n}`);
+    const scriptPreviewLines = generatedScript.text
+      ? generatedScript.text
+          .split('\n')
+          .map((l) => l.trim())
+          .filter(Boolean)
+          .slice(0, 12)
+          .join('\n')
+      : '';
+
+    const schemaData: Record<string, unknown> = {
       '@context': 'https://schema.org',
       '@type': 'Dataset',
-      'name': `${data.countryName} IP Delegations and CIDR Allocation Directory`,
-      'description': `Complete delegated IPv4 (${data.ipv4Count}) and IPv6 (${data.ipv6Count}) prefixes for ${data.countryName} (${data.countryCode}) with multi-format firewall rule generation.`,
-      'url': `https://ip-hub.ir/country/${data.countryCode.toUpperCase()}`,
-      'license': 'https://opensource.org/licenses/MIT',
-      'isAccessibleForFree': true,
-      'creator': {
-        '@type': 'Organization',
-        'name': 'IP-Hub',
-        'url': 'https://ip-hub.ir/'
+      '@id': `${pageUrl}#dataset-${activeFormat}-${ipVersion}-${accessType}`,
+      name:
+        language === 'fa'
+          ? `لیست IP ${localizedCountry} (${codeUpper}) با فرمت ${formatLabel} (${ipVersion.toUpperCase()} / ${accessType.toUpperCase()})`
+          : `${data.countryName} (${codeUpper}) IP List formatted for ${formatLabel} (${ipVersion.toUpperCase()}, ${accessType.toUpperCase()})`,
+      description:
+        language === 'fa'
+          ? `مجموعه داده اصلی شامل ${data.ipv4Count} پیشوند IPv4، ${data.ipv6Count} پیشوند IPv6 و ${data.asnCount} شماره ASN برای ${localizedCountry} (${codeUpper})، فرمت‌بندی‌شده بر اساس پارامترهای انتخابی (${formatLabel}، نسخه: ${ipVersion}، دسترسی: ${accessType}، نام لیست: ${activeListName}، تعداد قوانین تولیدشده: ${generatedScript.ruleCount}).`
+          : `Original RIR-delegated IP dataset for ${data.countryName} (${codeUpper}) containing ${data.ipv4Count} IPv4 CIDR blocks (${(data.totalEstimatedIpv4Addresses ?? 0).toLocaleString()} hosts), ${data.ipv6Count} IPv6 prefixes, and ${data.asnCount} Autonomous System Numbers, formatted with parameters: format=${activeFormat} (${formatLabel}), version=${ipVersion}, access=${accessType}, listName=${activeListName} (${generatedScript.ruleCount} generated rules).`,
+      url: pageUrl,
+      inLanguage: inLang,
+      license: 'https://opensource.org/licenses/MIT',
+      isAccessibleForFree: true,
+      ...(data.queryTime ? { dateModified: data.queryTime } : {}),
+      spatialCoverage: {
+        '@type': 'Country',
+        name: data.countryName,
+        identifier: codeUpper,
       },
-      'variableMeasured': [
-        'IPv4 CIDR prefixes',
-        'IPv6 CIDR prefixes',
-        'Origin ASNs',
-        'Estimated IPv4 address capacity'
+      creator: {
+        '@type': 'Organization',
+        '@id': 'https://ip-hub.ir/#organization',
+        name: 'IP-Hub',
+        url: 'https://ip-hub.ir/',
+      },
+      keywords: [
+        `${data.countryName} IP List`,
+        `${codeUpper} CIDR prefixes`,
+        `${data.countryName} ${formatLabel} firewall rules`,
+        ...sampleIpv4.slice(0, 5),
+        ...sampleAsns.slice(0, 5),
       ],
-      'distribution': [
+      variableMeasured: [
+        {
+          '@type': 'PropertyValue',
+          name: 'Country Code',
+          value: codeUpper,
+        },
+        {
+          '@type': 'PropertyValue',
+          name: 'Format Parameter',
+          value: activeFormat,
+        },
+        {
+          '@type': 'PropertyValue',
+          name: 'IP Version Parameter',
+          value: ipVersion,
+        },
+        {
+          '@type': 'PropertyValue',
+          name: 'Access Policy Parameter',
+          value: accessType,
+        },
+        {
+          '@type': 'PropertyValue',
+          name: 'List Name Parameter',
+          value: activeListName,
+        },
+        {
+          '@type': 'PropertyValue',
+          name: 'Generated Firewall Rule Count',
+          value: generatedScript.ruleCount,
+        },
+        {
+          '@type': 'PropertyValue',
+          name: 'Delegated IPv4 CIDR Count',
+          value: data.ipv4Count,
+        },
+        {
+          '@type': 'PropertyValue',
+          name: 'Delegated IPv6 CIDR Count',
+          value: data.ipv6Count,
+        },
+        {
+          '@type': 'PropertyValue',
+          name: 'Origin ASN Count',
+          value: data.asnCount,
+        },
+        {
+          '@type': 'PropertyValue',
+          name: 'Estimated Routable IPv4 Addresses',
+          value: data.totalEstimatedIpv4Addresses ?? 0,
+        },
+        ...(sampleIpv4.length > 0
+          ? [
+              {
+                '@type': 'PropertyValue',
+                name: 'Sample IPv4 CIDR Prefixes',
+                value: sampleIpv4.join(', '),
+              },
+            ]
+          : []),
+        ...(sampleIpv6.length > 0
+          ? [
+              {
+                '@type': 'PropertyValue',
+                name: 'Sample IPv6 CIDR Prefixes',
+                value: sampleIpv6.join(', '),
+              },
+            ]
+          : []),
+        ...(sampleAsns.length > 0
+          ? [
+              {
+                '@type': 'PropertyValue',
+                name: 'Sample Origin ASNs',
+                value: sampleAsns.join(', '),
+              },
+            ]
+          : []),
+      ],
+      distribution: [
         {
           '@type': 'DataDownload',
-          'encodingFormat': 'text/plain',
-          'name': `${data.countryName} Firewall Rule Direct Download`,
-          'contentUrl': `https://ip-hub.ir${downloadUrl || `/dl?country=${data.countryCode}&format=mikrotik`}`
-        }
-      ]
+          encodingFormat,
+          name: generatedScript.filename || `${codeUpper.toLowerCase()}_${activeFormat}.txt`,
+          description: `${data.countryName} (${codeUpper}) ${formatLabel} rules (version=${ipVersion}, access=${accessType}, listName=${activeListName}, rules=${generatedScript.ruleCount})`,
+          contentUrl: `https://ip-hub.ir${resolvedDlPath}`,
+        },
+        {
+          '@type': 'DataDownload',
+          encodingFormat: 'application/json',
+          name: `${data.countryName} (${codeUpper}) Raw JSON Resource`,
+          contentUrl: `https://ip-hub.ir/dl?country=${codeUpper}&format=json&version=${ipVersion}&access=${accessType}`,
+        },
+      ],
+      ...(scriptPreviewLines
+        ? {
+            hasPart: {
+              '@type': 'SoftwareSourceCode',
+              name: generatedScript.filename || `${codeUpper}_${activeFormat}`,
+              programmingLanguage: formatLabel,
+              text: scriptPreviewLines,
+            },
+          }
+        : {}),
     };
-    script.textContent = JSON.stringify(schemaData);
+
+    upsertPageDatasetSchema(schemaData);
 
     return () => {
-      const el = document.getElementById(scriptId);
-      if (el) el.remove();
+      removePageDatasetSchema();
     };
-  }, [data, downloadUrl]);
+  }, [
+    data,
+    downloadUrl,
+    format,
+    ipVersion,
+    accessType,
+    customListName,
+    generatedScript,
+    language,
+    pluginsList,
+    formats,
+    t.countryExplorer.formats,
+  ]);
 
   // Sync countryCode prop changes from URL/parent
   useEffect(() => {
@@ -1076,7 +1271,7 @@ export const CountryIpExplorer: React.FC<CountryIpExplorerProps> = ({
               <Alert
                 type="info"
                 showIcon
-                message={t.countryExplorer.directAnswerLabel || 'Direct Answer & Semantic Triples'}
+                title={t.countryExplorer.directAnswerLabel || 'Direct Answer & Semantic Triples'}
                 description={
                   <div style={{ lineHeight: 1.7, fontSize: 13 }}>
                     <strong>{data.countryName} ({data.countryCode})</strong> currently maintains{' '}

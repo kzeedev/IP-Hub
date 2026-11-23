@@ -227,7 +227,7 @@ func TestMarkdownNegotiation(t *testing.T) {
 	}
 
 	// Test Markdown for Agents request
-	reqMD := httptest.NewRequest(http.MethodGet, "/country/IR", nil)
+	reqMD := httptest.NewRequest(http.MethodGet, "/country/IR?format=cisco&version=ipv4&access=deny&listName=IR_ACL", nil)
 	reqMD.Header.Set("Accept", "text/markdown")
 	respMD, err := app.Test(reqMD)
 	if err != nil {
@@ -240,8 +240,12 @@ func TestMarkdownNegotiation(t *testing.T) {
 		t.Errorf("Expected Content-Signal header, got %s", cs)
 	}
 	bodyMD, _ := io.ReadAll(respMD.Body)
-	if !strings.Contains(string(bodyMD), "Delegated IP Ranges & Firewall Rules") {
-		t.Errorf("Expected Markdown content for country, got %s", string(bodyMD))
+	mdStr := string(bodyMD)
+	if !strings.Contains(mdStr, "Delegated IP Ranges & Firewall Rules") {
+		t.Errorf("Expected Markdown content for country, got %s", mdStr)
+	}
+	if !strings.Contains(mdStr, `"@type": "Dataset"`) || !strings.Contains(mdStr, "format=cisco") || !strings.Contains(mdStr, "IR_ACL") {
+		t.Errorf("Expected dynamic Dataset schema in Country Markdown reflecting desired format parameters, got %s", mdStr)
 	}
 }
 

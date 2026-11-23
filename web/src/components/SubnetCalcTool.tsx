@@ -4,11 +4,12 @@ import { CalculatorOutlined, NumberOutlined, CodeOutlined } from '@ant-design/ic
 import { SubnetBreakdown } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
 import { formatHostsCount } from '../utils/helpers';
+import { upsertPageDatasetSchema, removePageDatasetSchema } from '../utils/datasetSchema';
 
 const { Title, Text, Paragraph } = Typography;
 
 export const SubnetCalcTool: React.FC = () => {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const { token } = theme.useToken();
   const [ipInput, setIpInput] = useState('193.0.0.0');
   const [prefixLength, setPrefixLength] = useState<number>(21);
@@ -20,6 +21,137 @@ export const SubnetCalcTool: React.FC = () => {
     }, 250);
     return () => clearTimeout(timer);
   }, [ipInput, prefixLength]);
+
+  useEffect(() => {
+    if (!data) {
+      removePageDatasetSchema();
+      return;
+    }
+
+    const langPrefix = language === 'fa' ? '/fa' : '';
+    const inLang = language === 'fa' ? 'fa-IR' : 'en-US';
+    const pageUrl = `https://ip-hub.ir${langPrefix}/subnet-calc`;
+
+    upsertPageDatasetSchema({
+      '@context': 'https://schema.org',
+      '@type': 'Dataset',
+      '@id': `${pageUrl}#dataset-${encodeURIComponent(data.cidr)}`,
+      name:
+        language === 'fa'
+          ? `داده‌های محاسبه ساب‌نت CIDR برای ${data.cidr}`
+          : `CIDR Subnet Calculation Dataset for ${data.cidr} (IPv${data.ipVersion})`,
+      description:
+        language === 'fa'
+          ? `محاسبه دقیق مهندسی شبکه برای ساب‌نت ${data.cidr}: آدرس شبکه ${data.networkAddress}، نت‌مسک ${data.netmask || '-'}، وایلدکارد ${data.wildcardMask || '-'} و ${data.usableHosts} هاست قابل استفاده.`
+          : `Original CIDR subnet breakdown dataset for ${data.cidr}: Network Address ${data.networkAddress}, Netmask ${data.netmask || 'N/A'}, Wildcard Mask ${data.wildcardMask || 'N/A'}, Broadcast ${data.broadcastAddress || 'N/A'}, Usable Range ${data.firstUsableIp || '-'} to ${data.lastUsableIp || '-'} (${data.usableHosts} usable hosts).`,
+      url: pageUrl,
+      inLanguage: inLang,
+      license: 'https://opensource.org/licenses/MIT',
+      isAccessibleForFree: true,
+      creator: {
+        '@type': 'Organization',
+        '@id': 'https://ip-hub.ir/#organization',
+        name: 'IP-Hub',
+        url: 'https://ip-hub.ir/',
+      },
+      keywords: [
+        data.cidr,
+        data.networkAddress,
+        ...(data.netmask ? [data.netmask] : []),
+        ...(data.wildcardMask ? [data.wildcardMask] : []),
+        `IPv${data.ipVersion} subnet`,
+      ],
+      variableMeasured: [
+        {
+          '@type': 'PropertyValue',
+          name: 'CIDR Notation',
+          value: data.cidr,
+        },
+        {
+          '@type': 'PropertyValue',
+          name: 'IP Version',
+          value: `IPv${data.ipVersion}`,
+        },
+        {
+          '@type': 'PropertyValue',
+          name: 'Prefix Length',
+          value: `/${data.prefixLength}`,
+        },
+        {
+          '@type': 'PropertyValue',
+          name: 'Network Address',
+          value: data.networkAddress,
+        },
+        ...(data.broadcastAddress
+          ? [
+              {
+                '@type': 'PropertyValue',
+                name: 'Broadcast Address',
+                value: data.broadcastAddress,
+              },
+            ]
+          : []),
+        ...(data.netmask
+          ? [
+              {
+                '@type': 'PropertyValue',
+                name: 'Subnet Mask (Netmask)',
+                value: data.netmask,
+              },
+            ]
+          : []),
+        ...(data.wildcardMask
+          ? [
+              {
+                '@type': 'PropertyValue',
+                name: 'Cisco Wildcard Mask',
+                value: data.wildcardMask,
+              },
+            ]
+          : []),
+        ...(data.firstUsableIp && data.lastUsableIp
+          ? [
+              {
+                '@type': 'PropertyValue',
+                name: 'Usable Host IP Range',
+                value: `${data.firstUsableIp} - ${data.lastUsableIp}`,
+              },
+            ]
+          : []),
+        {
+          '@type': 'PropertyValue',
+          name: 'Total Address Capacity',
+          value: data.totalHosts,
+        },
+        {
+          '@type': 'PropertyValue',
+          name: 'Total Usable Hosts',
+          value: data.usableHosts,
+        },
+        ...(data.binaryIp
+          ? [
+              {
+                '@type': 'PropertyValue',
+                name: 'Binary IP Representation',
+                value: data.binaryIp,
+              },
+            ]
+          : []),
+      ],
+      distribution: [
+        {
+          '@type': 'DataDownload',
+          encodingFormat: 'application/json',
+          name: `${data.cidr} Subnet JSON Calculation`,
+          contentUrl: `https://ip-hub.ir/api/whois/subnet?ip=${encodeURIComponent(data.ip)}&cidr=${data.prefixLength}`,
+        },
+      ],
+    });
+
+    return () => {
+      removePageDatasetSchema();
+    };
+  }, [data, language]);
 
   const fetchSubnet = async (ip: string, cidr: number) => {
     try {
