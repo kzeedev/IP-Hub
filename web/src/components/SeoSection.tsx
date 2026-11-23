@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Button, Tag, Typography, Space, theme } from 'antd';
 import {
   ClusterOutlined,
@@ -13,8 +13,9 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { POPULAR_COUNTRIES } from '../utils/countries';
 import { getRouteUrl } from '../utils/router';
 import { FlagIcon } from './FlagIcon';
+import { SystemVersionResponse } from '../types';
 
-const { Title, Paragraph, Text } = Typography;
+const { Paragraph, Text } = Typography;
 
 interface SeoSectionProps {
   onExploreCountry?: (countryCode: string) => void;
@@ -24,6 +25,24 @@ export const SeoSection: React.FC<SeoSectionProps> = ({ onExploreCountry }) => {
   const { language, t, isRtl } = useLanguage();
   const { token } = theme.useToken();
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [version, setVersion] = useState<string>('dev');
+
+  useEffect(() => {
+    fetch('/api/system/version')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: SystemVersionResponse | null) => {
+        if (data?.version) {
+          const formatted = data.version.startsWith('v') || data.version === 'dev' ? data.version : `v${data.version}`;
+          setVersion(formatted);
+        }
+      })
+      .catch(() => {
+        // Fallback to default version
+      });
+  }, []);
+
+  const badgeVersion = version.replace(/^v/i, '');
+  const versionBadgeText = t.seo.versionBadge.replace('{version}', badgeVersion);
 
   const keywordsEn = [
     'Country IP List', 'GeoIP Database', 'MikroTik Address-List', 'Cisco ACL Country IP',
@@ -77,7 +96,7 @@ export const SeoSection: React.FC<SeoSectionProps> = ({ onExploreCountry }) => {
                 <Space orientation="horizontal" size={8} align="center">
                   <span style={{ fontWeight: 700, fontSize: 15 }}>{t.seo.heading}</span>
                   <Tag color="blue" variant="filled" style={{ fontSize: 11 }}>
-                    {t.seo.guideBadge}
+                    {versionBadgeText}
                   </Tag>
                 </Space>
                 <div style={{ fontSize: 12, color: token.colorTextSecondary }}>
