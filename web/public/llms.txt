@@ -129,6 +129,4 @@ IP-Hub provides a dedicated direct file download endpoint for automated edge rou
 - **Content Negotiation**: Send `Accept: text/markdown` on any page to receive structured Markdown rather than HTML.
 - **API Catalog**: RFC 9727 linkset catalog available at `https://ip-hub.ir/.well-known/api-catalog`.
 - **OpenAPI 3.1 Documentation**: Interactive docs available at `https://ip-hub.ir/docs` and OpenAPI JSON at `https://ip-hub.ir/openapi.json`.
-- **API Catalog**: RFC 9727 linkset catalog available at `https://ip-hub.ir/.well-known/api-catalog`.
-- **OpenAPI 3.1 Documentation**: Interactive docs available at `https://ip-hub.ir/docs` and OpenAPI JSON at `https://ip-hub.ir/openapi.json`.
 
