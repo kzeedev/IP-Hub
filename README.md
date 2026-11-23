@@ -41,6 +41,7 @@ A self-hosted, open-source network intelligence platform powered by **RIPE NCC**
 | ⚡ **Redis Caching** | Smart caching layer for fast repeat queries and reduced upstream load |
 | 🔌 **Plugin System** | Dynamic Go plugin architecture for custom firewall output formats |
 | 📖 **OpenAPI 3.1 & Docs** | Interactive documentation at `/docs` (Stoplight Elements), OpenAPI 3.1 specs (`/openapi.json`, `/openapi.yaml`), and RFC 9727 API catalog (`/.well-known/api-catalog`) |
+| 🤖 **MCP Server** | Built-in Model Context Protocol server at `/mcp` (Streamable HTTP) with 6 network tools, 5 URI resources, and 7 bilingual prompt templates for AI assistants |
 
 ## 🏗️ Architecture
 
@@ -133,7 +134,48 @@ IP-Hub exposes a modern OpenAPI 3.1 specification powered by [GoFiber's OpenAPI 
 | `GET` | `/api/system/resolvers` | Real-time status of background country name resolving services |
 | `POST` | `/api/whois/batch` | Concurrently inspect up to 50 IP addresses |
 | `GET` | `/api/whois/subnet` | Calculate subnet breakdown, netmask, wildcard, and usable hosts |
+| `POST` | `/mcp` | Model Context Protocol (MCP) Streamable HTTP endpoint for AI agents |
 | `GET` | `/.well-known/api-catalog` | RFC 9727 machine-readable API discovery catalog |
+
+## 🤖 Model Context Protocol (MCP) Server
+
+IP-Hub includes a built-in **MCP Server** over **Streamable HTTP** at `https://ip-hub.ir/mcp` with no API key required. Interactive setup instructions are available in the UI at `/mcp`.
+
+### Quick Client Setup
+
+**Claude Code CLI:**
+```bash
+claude mcp add --transport http ip-hub https://ip-hub.ir/mcp
+```
+
+**Cursor (`.cursor/mcp.json`):**
+```json
+{
+  "mcpServers": {
+    "ip-hub": {
+      "url": "https://ip-hub.ir/mcp"
+    }
+  }
+}
+```
+
+**VS Code / GitHub Copilot (`.vscode/mcp.json`):**
+```json
+{
+  "servers": {
+    "ip-hub": {
+      "type": "http",
+      "url": "https://ip-hub.ir/mcp"
+    }
+  }
+}
+```
+
+### Capabilities
+
+- **Tools (6)**: `whois_lookup`, `country_resources`, `whois_batch`, `subnet_calculator`, `system_status`, `list_plugins`
+- **Resources & URI Templates (5)**: `iphub://country/{code}`, `iphub://country/{code}/rules/{format}`, `iphub://system/status`, `iphub://system/plugins`, `iphub://docs/llms.txt`
+- **Bilingual Prompts (7)**: `country_ip_list_fa`, `generate_country_firewall_config`, `ddos_geoip_mitigation_guide`, `investigate_network_resource`, `batch_ip_security_triage`, `asn_bgp_peering_analysis`, `subnet_planning_assistant`
 
 ## 🐳 Docker
 
